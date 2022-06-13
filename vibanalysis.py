@@ -2,6 +2,40 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.cluster import KMeans
 
+def create_directory(folder_name):
+
+    #Create folder if not exists
+    isExist = os.path.exists(path + str(num_coleta) + "/" + folder_name)
+    if not isExist:
+        os.makedirs(path + str(num_coleta) + "/" + folder_name)
+
+
+def DFT(y, SAMPLE_RATE):
+    Y = np.abs(fft(y))
+    N = len(Y)
+    freq = fftfreq(N, 1.0 / SAMPLE_RATE)
+    N = N//2
+    return F[:N], Y[:N]
+
+def DFT_normalized(y, SAMPLE_RATE):
+    Y = np.abs(fft(y))
+    N = len(Y)
+    F = fftfreq(N, 1.0 / SAMPLE_RATE)
+    F = F/1000.0
+    N = N//2
+    return N, F[:N], Y[:N]/N
+
+def convert_to_g(y):
+    y_g = [v * const_g for v in y]
+    return y_g
+
+def convert_to_a(y):
+    y_a = [v / const_g for v in y]
+    return y_a
+
+
+
+
 class VibCharts:
     def __init__(self, 
             coleta = 14, 
@@ -17,6 +51,7 @@ class VibCharts:
         self.frequence = frequence
         self.path = path
         self.const_g = 0.109172
+        self.unit = 'a'
         
         self.Vibrations = [[],[],[]]
         self.numVibrations = 0
@@ -56,7 +91,7 @@ class VibCharts:
 
 
     def plot_histogram(self):
-        
+
         vib = [abs(v) for v in self.Vibrations[0]]
 
         n, bins, patches = plt.hist(vib, 1000, density=False, facecolor='g')
@@ -68,6 +103,49 @@ class VibCharts:
         #plt.ylim(0, 0.03)
         plt.grid(True)
         plt.show()
+
+    
+    def plotVibration(self):
+        
+        if self.numParts == 0:
+            if self.unit == 'a':
+                plt.plot( self.Time, self.Vibrations[0], 'b' )
+                plt.ylabel( "Amplitude (m/s^2)" )
+
+            elif self.unit == 'g':
+                plt.plot( self.Time, convert_to_g(self.Vibrations[0]), 'b' )
+                plt.ylabel( "Amplitude (g)" )
+
+            plt.xlabel( "Tempo (s)" )
+            plt.grid( linestyle='--', axis='y' )
+            plt.show()
+            plt.close()
+            plt.cla()
+            plt.clf()
+
+        else:
+
+            for i in range(self.numParts):
+                if self.unit == 'a':
+                    plt.plot( self.Time[self.parts[i][1]:self.parts[i][2]], 
+                              self.Vibrations[0][self.parts[i][1]:self.parts[i][2]], 'b' )
+                    plt.ylabel( "Amplitude (m/s^2)" )
+
+                elif self.unit == 'g':
+                    plt.plot( self.Time[self.parts[i][1]:self.parts[i][2]], convert_to_g(self.Vibrations[0][self.parts[i][1]:self.parts[i][2]]), 'b' )
+                    plt.ylabel( "Amplitude (g)" )
+
+                plt.xlabel( "Tempo (s)" )
+                plt.grid( linestyle='--', axis='y' )
+                plt.show()
+                plt.close()
+                plt.cla()
+                plt.clf()
+
+
+
+
+
 
     def count_parts(self, clusters):
         
@@ -123,24 +201,30 @@ class VibCharts:
         labels_ = kmeans.labels_.tolist()
         self.stitcher(labels_, stitcher_coef)
         parts = self.groupWindows(labels_)
-        num_parts = len(parts)
+        self.numParts = len(parts)
+        print('number of parts:', self.numParts)
 
         print(kmeans.cluster_centers_[0], kmeans.cluster_centers_[1])
         if kmeans.cluster_centers_[0] > kmeans.cluster_centers_[1]:
-            for i in range(num_parts):
+            for i in range(self.numParts):
                 parts[i][0] = 1 - parts[i][0]
 
-        for i in range(num_parts):
+        parts[0].append(0)
+        print()
+        parts[0][1], parts[0][2] = parts[0][2], parts[0][1] * window
+        print(parts[0])
+        for i in range(1, self.numParts):
+            parts[i].append(parts[i-1][2])
             parts[i][1] *= window
+            parts[i][1], parts[i][2] = parts[i][2], parts[i][2] + parts[i][1] 
             print(parts[i])
 
-        print('number of parts:', num_parts)
         self.parts = parts
-        self.numParts = num_parts
-
         
 
 
-v = VibCharts(10, 19, [2])
+v = VibCharts(14, 1, [1])
 v.getVibrations()
+#v.plotVibration()
 v.vibrationParts()
+v.plotVibration()
