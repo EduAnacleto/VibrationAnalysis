@@ -42,7 +42,7 @@ class VibCharts:
             test = 5, 
             Sensores = [1],
             frequence = 100000,
-            path = "/media/eduardo/SARA/Cláudio - Projeto VW/Coleta"
+            path = "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta"
             ):
 
         self.test = test
