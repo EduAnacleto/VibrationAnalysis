@@ -4,6 +4,7 @@ import math
 import os
 from sklearn.cluster import KMeans
 from scipy.fft import fft, fftfreq
+import dwdatareader as dw
 
 
 class VibCharts:
@@ -11,12 +12,14 @@ class VibCharts:
             coleta = 14,
             test = 5,
             Sensores = [1],
+            dxdPart = [0],
             frequence = 100000,
             path = "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta"
             ):
 
         self.test = test
         self.coleta = coleta
+        self.dxdPart = dxdPart
         self.Sensores = Sensores
         self.frequence = frequence
         self.path = path
@@ -157,24 +160,48 @@ class VibCharts:
 
 
     def getVibrations(self):
-        # Read data
-        text_file = open(self.path + str(self.coleta) + "/teste_" + str(self.test) + ".csv", "r" )
-        #skip the first two lines
-        if self.coleta != 12 or self.coleta != 11:
-            next( text_file )
-            next( text_file )
-        self.numVibrations = 0;
-        for line in text_file:
-            row_text = line.split(";")
-            for s in self.Sensores:
-                self.Vibrations[s-1].append( float(row_text[s]))
+        
+        if self.coleta != 11 and self.coleta != 12:
 
-            self.numVibrations += 1
-        text_file.close()
-        # Duration in seconds 
-        self.duration = self.numVibrations / self.frequence
-        # time vector
-        self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False)
+            # Read data
+            text_file = open(self.path + str(self.coleta) + "/teste_" + str(self.test) + ".csv", "r" )
+            #skip the first two lines
+            if self.coleta != 12 or self.coleta != 11:
+                next( text_file )
+                next( text_file )
+            self.numVibrations = 0;
+            for line in text_file:
+                row_text = line.split(";")
+                for s in self.Sensores:
+                    self.Vibrations[s-1].append( float(row_text[s]))
+
+                self.numVibrations += 1
+            text_file.close()
+            # time vector
+            self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False)
+            # Duration in seconds 
+            self.duration = self.numVibrations / self.frequence
+
+        else:
+            
+            
+            for part in range(self.dxdPart[0], self.dxdPart[1]+1):
+                with dw.open( self.path + str(self.coleta) + "/Dados/faceamento " + str(self.test) + "_{:04d}.dxd".format(part)) as f:
+                    canais = []
+                    canal = [[],[],[]]
+                    for ch in f.values():
+                        canais.append( ch.name )
+                    
+                    for sensor in self.Sensores:                        
+                        canal[sensor-1] = f[canais[sensor-1]].series()
+                        self.Vibrations[sensor-1] += list(canal[sensor-1].values)
+                    self.Time += list(canal[0].index)
+
+                # number of vibrations
+                self.numVibrations = len(self.Vibrations[0])
+                # Duration in seconds 
+                self.duration = self.numVibrations / self.frequence
+
 
 
     def getParameters( self ):
@@ -238,9 +265,9 @@ class VibCharts:
         plt.show( )
 
     
-    def plotVibration( self ):
-        if self.numParts == 0 :
-            if self.unit == 'a' :
+    def plotVibration( self, sensor ):
+        if self.numParts[sensor-1] == 0 :
+            if self.unit == 'a':
                 plt.plot( self.Time, self.Vibrations[0], 'b' )
                 plt.ylabel( "Amplitude (m/s^2)" )
 
@@ -256,14 +283,14 @@ class VibCharts:
             plt.clf()
 
         else:
-            for i in range(self.numParts):
+            for i in range(self.numParts[sensor-1]):
                 if self.unit == 'a':
-                    plt.plot( self.Time[self.parts[i][1]:self.parts[i][2]], 
-                        self.Vibrations[0][self.parts[i][1]:self.parts[i][2]], 'b' )
+                    plt.plot( self.Time[self.parts[sensor-1][i][1]:self.parts[sensor-1][i][2]], 
+                        self.Vibrations[0][self.parts[sensor-1][i][1]:self.parts[sensor-1][i][2]], 'b' )
                     plt.ylabel( "Amplitude (m/s^2)" )
 
                 elif self.unit == 'g':
-                    plt.plot( self.Time[self.parts[i][1]:self.parts[i][2]], convert_to_g(self.Vibrations[0][self.parts[i][1]:self.parts[i][2]]), 'b' )
+                    plt.plot( self.Time[self.parts[sensor-1][i][1]:self.parts[sensor-1][i][2]], convert_to_g(self.Vibrations[0][self.parts[sensor-1][i][1]:self.parts[sensor-1][i][2]]), 'b' )
                     plt.ylabel( "Amplitude (g)" )
 
                 plt.xlabel( "Tempo (s)" )
@@ -357,18 +384,21 @@ class VibCharts:
 if __name__ == '__main__':
 
     #Data
-    for coleta in [14]:
-        for test in [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12]:
-            v = VibCharts(coleta, test, [1, 2, 3])
-            v.getParameters()
-            print("Coleta", coleta, "Test", test)
-    for coleta in [13]:
-        for test in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]:
-            v = VibCharts(coleta, test, [1, 2, 3])
-            v.getParameters()
-            print("Coleta", coleta, "Test", test)
+    #for coleta in [14]:
+    #    for test in [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12]:
+    #        v = VibCharts(coleta, test, [1, 2, 3])
+    #        v.getParameters()
+    #        print("Coleta", coleta, "Test", test)
+    #for coleta in [13]:
+    #    for test in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]:
+    #        v = VibCharts(coleta, test, [1, 2, 3])
+    #        v.getParameters()
+    #        print("Coleta", coleta, "Test", test)
 
-    #v.getVibrations()
-    #v.plotVibration()
+    
+
+    v = VibCharts(12, 1, [1,2], [3, 5])
+    v.getVibrations()
+    v.plotVibration(1)
     #v.vibrationParts()
     #v.plotVibration()
