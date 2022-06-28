@@ -25,6 +25,16 @@ class VibCharts:
         self.path = path
         self.const_g = 0.109172
         self.unit = 'a'
+
+        self.Colors = ['-b', '-r', '-g']
+        self.Legend = [['Sensor 1'], ['Sensor 2'], ['Sensor 3']]
+        self.yLabel = dict()
+        self.yLabel['a'] = "Amplitude (m/s^2)"
+        self.yLabel['u'] = "Amplitude (g)"
+        self.my_dpi = 100
+        self.altura = 5.5
+        self.largura = 20
+
         
         self.Vibrations = [[],[],[]]
         self.numVibrations = 0
@@ -32,7 +42,7 @@ class VibCharts:
         self.duration = 0
 
         self.parts = [[],[],[]]
-        self.numParts = [0,0,0]        
+        self.numParts = [0,0,0]
         self.numPassadas = [0,0,0]
         self.durationPassadas = [0,0,0]
 
@@ -51,7 +61,6 @@ class VibCharts:
         self.dft_lower = [0,0,0]
         self.dft_upper = [0,0,0]
         self.dft_max = [0,0,0]
-
 
 
     def create_directory(self, folder_name):
@@ -179,12 +188,11 @@ class VibCharts:
             text_file.close()
             # time vector
             self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False)
-            # Duration in seconds 
+            # Duration in seconds
             self.duration = self.numVibrations / self.frequence
 
         else:
-            
-            
+
             for part in range(self.dxdPart[0], self.dxdPart[1]+1):
                 with dw.open( self.path + str(self.coleta) + "/Dados/faceamento " + str(self.test) + "_{:04d}.dxd".format(part)) as f:
                     canais = []
@@ -251,7 +259,7 @@ class VibCharts:
                     "\n")
 
 
-    def plot_histogram(self):
+    def plotHistogram(self):
         vib = [abs(v) for v in self.Vibrations[0]]
 
         n, bins, patches = plt.hist( vib, 1000, density = False, facecolor='g' )
@@ -265,28 +273,53 @@ class VibCharts:
         plt.show( )
 
     
-    def plotVibration( self, sensor ):
+    def plotVibrations( self, sensor ):
+
+        self.create_directory("Charts")
+
         if self.numParts[sensor-1] == 0 :
+            
+            plt.rc('font', **{'size' : 18})
+            plt.ticklabel_format(style = 'plain')
+            plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
+            title = "Gráfico no domínio do tempo do teste " + str(self.test) + " da coleta " + str(self.coleta)
+
+            if self.coleta != 11 and self.coleta != 12:
+                plt.title( title )
+            else:
+                if self.dxdPart[0] == self.dxdPart[1]:
+                    plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
+                else:
+                    plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
+
+
             if self.unit == 'a':
-                plt.plot( self.Time, self.Vibrations[0], 'b' )
-                plt.ylabel( "Amplitude (m/s^2)" )
-
+                plt.plot( self.Time, self.Vibrations[sensor-1], self.Colors[sensor-1] )
             elif self.unit == 'g':
-                plt.plot( self.Time, convert_to_g(self.Vibrations[0]), 'b' )
-                plt.ylabel( "Amplitude (g)" )
+                plt.plot( self.Time, convert_to_g(self.Vibrations[sensor-1]), self.Colors[sensor-1] )
 
+            plt.ylabel( self.yLabel[self.unit] )
+            plt.legend( self.Legend[sensor-1] )
             plt.xlabel( "Tempo (s)" )
             plt.grid( linestyle='--', axis='y' )
-            plt.show()
+
+            figpath = self.path + str(self.coleta) + '/Charts/VibT' + str(self.test) + 'S' + str(sensor)
+            if self.coleta != 11 and self.coleta != 12:
+                plt.savefig( figpath + self.unit + '.png' )
+            else:
+                plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
+
             plt.close()
             plt.cla()
             plt.clf()
 
+
         else:
+
             for i in range(self.numParts[sensor-1]):
                 if self.unit == 'a':
                     plt.plot( self.Time[self.parts[sensor-1][i][1]:self.parts[sensor-1][i][2]], 
-                        self.Vibrations[0][self.parts[sensor-1][i][1]:self.parts[sensor-1][i][2]], 'b' )
+                        self.Vibrations[0][self.parts[sensor-1][i][1]:self.parts[sensor-1][i][2]], 'b')
                     plt.ylabel( "Amplitude (m/s^2)" )
 
                 elif self.unit == 'g':
@@ -384,6 +417,12 @@ class VibCharts:
 if __name__ == '__main__':
 
     #Data
+    for coleta in [12]:
+        for test in [1]:
+            for arq in range(78):
+                v = VibCharts(coleta, test, [1,2], [arq,arq])
+                v.getParameters()
+                print("Coleta", coleta, "Test", test, "Arq", arq)
     #for coleta in [14]:
     #    for test in [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12]:
     #        v = VibCharts(coleta, test, [1, 2, 3])
@@ -395,10 +434,11 @@ if __name__ == '__main__':
     #        v.getParameters()
     #        print("Coleta", coleta, "Test", test)
 
-    
+    Sensores = [1, 2]
 
-    v = VibCharts(12, 1, [1,2], [3, 5])
+    v = VibCharts(12, 1, Sensores, [40, 40])
     v.getVibrations()
-    v.plotVibration(1)
+    for sensor in Sensores:
+        v.plotVibrations(sensor)
     #v.vibrationParts()
-    #v.plotVibration()
+    #v.plotVibrations()
