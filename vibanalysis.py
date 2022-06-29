@@ -13,7 +13,8 @@ class VibCharts:
             test = 5,
             Sensores = [1],
             dxdPart = [0],
-            frequence = 100000,
+            sampleRate = 100000,
+            Frequence = [7000],
             path = "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta"
             ):
 
@@ -21,7 +22,8 @@ class VibCharts:
         self.coleta = coleta
         self.dxdPart = dxdPart
         self.Sensores = Sensores
-        self.frequence = frequence
+        self.sampleRate = sampleRate
+        self.Frequence = Frequence
         self.path = path
         self.const_g = 0.109172
         self.unit = 'a'
@@ -72,17 +74,17 @@ class VibCharts:
     def DFT(self, y):
         Y = np.abs(fft(y))
         N = len(Y)
-        freq = fftfreq(N, 1.0 / self.frequence)
-        N = N//2
+        freq = fftfreq(N, 1.0 / self.sampleRate)
+        N //= 2
         return F[:N], Y[:N]
 
 
-    def DFT_normalized(self, y):
+    def DFTNormalized(self, y):
         Y = np.abs(fft(y))
         N = len(Y)
-        F = fftfreq(N, 1.0 / self.frequence)
-        F = F/1000.0
-        N = N//2
+        F = fftfreq(N, 1.0 / self.sampleRate)
+        F /= 1000.0
+        N //= 2
         return N, F[:N], Y[:N]/N
 
 
@@ -94,18 +96,20 @@ class VibCharts:
         for i in range(1, y_size):
             if y[i] - y[i-1] > 1:
                 jump.append(y[i] - y[i-1])
+
         lower_outlier = []
         upper_outlier = []
+        #print("jump", jump)
+        #print("tail", y)
 
         if jump != []:
             s_avg = np.average(jump)
             s_std = np.std(jump)
             #print(s_std)
             #print(jump)
-            
             for i in range(y_size//2, 0, -1):
-                if y[i] - y[i-1] > s_avg + 3 * s_std:
-                    lower_outlier.append(i-1)
+                if y[i] - y[i-1] < s_avg - 3 * s_std:
+                    lower_outlier.append(i+1)
                     break
             for i in range( y_size//2, y_size):
                 if y[i] - y[i-1] > s_avg + 3 * s_std:
@@ -122,7 +126,7 @@ class VibCharts:
 
 
     def dft_dispersion_measures(self, y):
-        N, F, yf = self.DFT_normalized(y)
+        N, F, yf = self.DFTNormalized(y)
         return self.dispersion_measures(yf)
 
     def convert_to_g(self, y):
@@ -155,7 +159,7 @@ class VibCharts:
                 for j in range(self.parts[sensor-1][i][1], self.parts[sensor-1][i][2]):
                     rms_pass += y[j]**2
 
-        self.durationPassadas[sensor-1] = pass_size / self.frequence
+        self.durationPassadas[sensor-1] = pass_size / self.sampleRate
         
         if movi_size != 0:
             rms_movi = math.sqrt( rms_movi / movi_size )
@@ -169,7 +173,6 @@ class VibCharts:
 
 
     def getVibrations(self):
-        
         if self.coleta != 11 and self.coleta != 12:
 
             # Read data
@@ -189,7 +192,7 @@ class VibCharts:
             # time vector
             self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False)
             # Duration in seconds
-            self.duration = self.numVibrations / self.frequence
+            self.duration = self.numVibrations / self.sampleRate
 
         else:
 
@@ -208,7 +211,7 @@ class VibCharts:
                 # number of vibrations
                 self.numVibrations = len(self.Vibrations[0])
                 # Duration in seconds 
-                self.duration = self.numVibrations / self.frequence
+                self.duration = self.numVibrations / self.sampleRate
 
 
 
@@ -252,11 +255,81 @@ class VibCharts:
                     " {:10.5f};".format(self.vib_lower[sensor-1]) +
                     " {:10.5f};".format(self.vib_upper[sensor-1]) +
                     " {:10.5f};".format(self.vib_max[sensor-1]) +
-                    " {:10.5f};".format(self.dft_min[sensor-1]) +
-                    " {:10.5f};".format(self.dft_lower[sensor-1]) +
                     " {:10.5f};".format(self.dft_upper[sensor-1]) +
                     " {:10.5f};".format(self.dft_max[sensor-1]) +
                     "\n")
+
+    
+    def extValues_LWFence(self, array):
+        y = array[:]
+        y.sort()
+        N = len(y)
+
+        Q1 = y[(N*1)//4]
+        Q3 = y[(N*3)//4]
+        IQR = Q3 - Q1
+        min_before_lower_fence = Q1
+        max_before_lower_fence = Q3
+
+        for i in range(N):
+            if y[i] > Q1 - 1.5 * IQR:
+                min_before_lower_fence = y[i]
+                break
+        for i in range(N-1, -1, -1):
+            if y[i] < Q3 + 1.5 * IQR:
+                min_before_lower_fence = y[i]
+                break
+                
+        return min_before_lower_fence, max_before_lower_fence
+
+
+    def extValues_normalityBand(self, array):
+        y = array[:]
+        y.sort()
+        N = len(y)
+        avg = np.average(array)
+        std = np.std(array)
+
+        lower = y[0]
+        upper = y[-1]
+
+        print('lower:', avg - 3 * std / np.sqrt(N), 'upper:', avg + 3 * std / np.sqrt(N))
+        for i in range(N):
+            if y[i] > avg - 3 * std / np.sqrt(N):
+                lower = y[i]
+                break
+        for i in range(N-1, 0, -1):
+            if y[i] < avg + 3 * std / np.sqrt(N):
+                upper = y[i]
+                break
+                        
+        return lower, upper
+
+
+
+    def setParameters( self ):
+        lower_vib = [[],[],[]]
+        upper_vib = [[],[],[]]
+        upper_dft = [[],[],[]]
+
+
+        # Read data
+        text_file = open(self.path + str(self.coleta) + "/Data/data_" + self.unit + ".txt", "r")
+        for line in text_file:
+            row_text = line.split(";")
+            sensor = int(row_text[2])
+            lower_vib[sensor-1].append(float(row_text[13]))
+            upper_vib[sensor-1].append(float(row_text[14]))
+            upper_dft[sensor-1].append(float(row_text[16]))
+        text_file.close()
+
+        for sensor in self.Sensores:
+            self.vib_lower[sensor-1], blank = self.extValues_normalityBand(lower_vib[sensor-1])
+            blank, self.vib_upper[sensor-1] = self.extValues_normalityBand(upper_vib[sensor-1])
+            blank, self.dft_upper[sensor-1] = self.extValues_normalityBand(upper_dft[sensor-1])
+            print(self.vib_lower[sensor-1], self.vib_upper[sensor-1], self.dft_upper[sensor-1] )
+            
+
 
 
     def plotHistogram(self):
@@ -273,11 +346,12 @@ class VibCharts:
         plt.show( )
 
     
-    def plotVibrations( self, sensor ):
+    def plotVibration( self, sensor ):
 
         self.create_directory("Charts")
+        self.setParameters()
 
-        if self.numParts[sensor-1] == 0 :
+        if self.numParts[sensor-1] == 0:
             
             plt.rc('font', **{'size' : 18})
             plt.ticklabel_format(style = 'plain')
@@ -298,6 +372,7 @@ class VibCharts:
             elif self.unit == 'g':
                 plt.plot( self.Time, convert_to_g(self.Vibrations[sensor-1]), self.Colors[sensor-1] )
 
+            plt.ylim( self.vib_lower[sensor-1], self.vib_upper[sensor-1] )
             plt.ylabel( self.yLabel[self.unit] )
             plt.legend( self.Legend[sensor-1] )
             plt.xlabel( "Tempo (s)" )
@@ -332,6 +407,54 @@ class VibCharts:
                 plt.close()
                 plt.cla()
                 plt.clf()
+
+    
+    def plotDFT(self, sensor):
+
+        self.create_directory("Charts")
+
+        y_ = self.Vibrations[sensor-1]
+        if self.unit == 'g':
+            y_ = self.convert_to_g(y_)
+        N, xf, yf = self.DFTNormalized(y_)
+
+        for freq in self.Frequence:
+
+            plt.rc('font', **{'size' : 18})
+            plt.ticklabel_format(style = 'plain')
+            plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
+            title = "Gráfico no domínio da frequência do teste " + str(self.test) + " da coleta " + str(self.coleta)
+
+            if self.coleta != 11 and self.coleta != 12:
+                plt.title( title )
+            else:
+                if self.dxdPart[0] == self.dxdPart[1]:
+                    plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
+                else:
+                    plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
+            
+            plt.plot( xf[:int(N * (2000*freq/self.sampleRate))], yf[:int(N * (2000*freq/self.sampleRate))], self.Colors[sensor-1])
+            
+            
+            plt.ylim( 0, self.dft_upper[sensor-1] )
+            plt.xlabel("Frequência (kHz)")
+            plt.grid(linestyle='--', axis='y')
+
+            plt.ylabel( self.yLabel[self.unit] )
+            plt.legend( self.Legend[sensor-1] )
+            plt.xlabel( "Tempo (s)" )
+            plt.grid( linestyle='--', axis='y' )
+
+            figpath = self.path + str(self.coleta) + '/Charts/DFT' + str(freq) + 'kT' + str(self.test) + 'S' + str(sensor)
+            if self.coleta != 11 and self.coleta != 12:
+                plt.savefig( figpath + self.unit + '.png' )
+            else:
+                plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
+
+            plt.close()
+            plt.cla()
+            plt.clf()
+
 
 
 
@@ -412,17 +535,22 @@ class VibCharts:
             self.numPassadas[sensor-1] += self.parts[sensor-1][i][0]
 
 
-
-
 if __name__ == '__main__':
 
     #Data
-    for coleta in [12]:
-        for test in [1]:
-            for arq in range(78):
-                v = VibCharts(coleta, test, [1,2], [arq,arq])
-                v.getParameters()
-                print("Coleta", coleta, "Test", test, "Arq", arq)
+    #for coleta in [12]:
+    #    Sensores = [1]
+    #    for test in [1]:
+    #        for arq in range(78):
+    #            v = VibCharts(coleta, test, Sensores, [arq,arq])
+    #            v.getParameters()                
+    #            print("Coleta", coleta, "Test", test, "Arq", arq, "- Parameters")
+        #for sensor in Sensores:
+        #    v.plotVibration(sensor)
+        #    v.plotDFT(sensor)
+        #print("Coleta", coleta, "Test", test, "Arq", arq, "- Charts")
+                   
+
     #for coleta in [14]:
     #    for test in [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12]:
     #        v = VibCharts(coleta, test, [1, 2, 3])
@@ -434,11 +562,9 @@ if __name__ == '__main__':
     #        v.getParameters()
     #        print("Coleta", coleta, "Test", test)
 
-    Sensores = [1, 2]
-
-    v = VibCharts(12, 1, Sensores, [40, 40])
-    v.getVibrations()
-    for sensor in Sensores:
-        v.plotVibrations(sensor)
-    #v.vibrationParts()
-    #v.plotVibrations()
+    for arq in [0, 7]:
+        v = VibCharts(12, 1, [1], [arq, arq])
+        v.getVibrations()
+        #v.vibrationParts()
+        v.plotVibration(1)
+        v.plotDFT(1)
