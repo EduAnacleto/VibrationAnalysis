@@ -173,6 +173,7 @@ class VibCharts:
 
 
     def getVibrations(self):
+
         if self.coleta != 11 and self.coleta != 12:
 
             # Read data
@@ -197,7 +198,10 @@ class VibCharts:
         else:
 
             for part in range(self.dxdPart[0], self.dxdPart[1]+1):
-                with dw.open( self.path + str(self.coleta) + "/Dados/faceamento " + str(self.test) + "_{:04d}.dxd".format(part)) as f:
+                file_name = self.path + str(self.coleta) + "/Dados/faceamento " + str(self.test) + "_{:04d}.dxd".format(part)
+
+                print(file_name)
+                with dw.open( file_name ) as f:
                     canais = []
                     canal = [[],[],[]]
                     for ch in f.values():
@@ -286,6 +290,7 @@ class VibCharts:
     def extValues_normalityBand(self, array):
         y = array[:]
         y.sort()
+        #print(y)
         N = len(y)
         avg = np.average(array)
         std = np.std(array)
@@ -293,14 +298,13 @@ class VibCharts:
         lower = y[0]
         upper = y[-1]
 
-        print('lower:', avg - 3 * std / np.sqrt(N), 'upper:', avg + 3 * std / np.sqrt(N))
         for i in range(N):
-            if y[i] > avg - 3 * std / np.sqrt(N):
-                lower = y[i]
+            if y[i] > avg - 10 * (std / np.sqrt(N)):
+                lower = y[i+1]
                 break
         for i in range(N-1, 0, -1):
-            if y[i] < avg + 3 * std / np.sqrt(N):
-                upper = y[i]
+            if y[i] < avg + 10 * (std / np.sqrt(N)):
+                upper = y[i-1]
                 break
                         
         return lower, upper
@@ -322,6 +326,8 @@ class VibCharts:
             upper_vib[sensor-1].append(float(row_text[14]))
             upper_dft[sensor-1].append(float(row_text[16]))
         text_file.close()
+
+        #print(lower_vib)
 
         for sensor in self.Sensores:
             self.vib_lower[sensor-1], blank = self.extValues_normalityBand(lower_vib[sensor-1])
@@ -349,7 +355,6 @@ class VibCharts:
     def plotVibration( self, sensor ):
 
         self.create_directory("Charts")
-        self.setParameters()
 
         if self.numParts[sensor-1] == 0:
             
@@ -562,9 +567,12 @@ if __name__ == '__main__':
     #        v.getParameters()
     #        print("Coleta", coleta, "Test", test)
 
-    for arq in [0, 7]:
-        v = VibCharts(12, 1, [1], [arq, arq])
+    Sensores = [1]
+    for arq in range(78):
+        v = VibCharts(12, 1, Sensores, [arq, arq])
         v.getVibrations()
         #v.vibrationParts()
-        v.plotVibration(1)
-        v.plotDFT(1)
+        v.setParameters()
+        for sensor in Sensores:
+            v.plotVibration(sensor)
+            v.plotDFT(sensor)
