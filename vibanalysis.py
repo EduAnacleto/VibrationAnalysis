@@ -14,7 +14,7 @@ class VibCharts:
             Sensores = [1],
             dxdPart = [0],
             sampleRate = 100000,
-            Frequence = [7000],
+            Frequence = [7],
             path = "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta"
             ):
 
@@ -28,11 +28,12 @@ class VibCharts:
         self.const_g = 0.109172
         self.unit = 'a'
 
-        self.Colors = ['-b', '-r', '-g']
+        #self.Colors = ['-b', '-r', '-g']
+        self.Colors = ['blue', 'red', 'green']
         self.Legend = [['Sensor 1'], ['Sensor 2'], ['Sensor 3']]
         self.yLabel = dict()
-        self.yLabel['a'] = "Amplitude (m/s^2)"
-        self.yLabel['u'] = "Amplitude (g)"
+        self.yLabel['a'] = "Aceleração (m/s^2)"
+        self.yLabel['u'] = "Aceleração (g)"
         self.my_dpi = 100
         self.altura = 5.5
         self.largura = 20
@@ -91,41 +92,42 @@ class VibCharts:
 
     def dispersion_measures( self, lista ):
         y = lista[:]
-        y_size = len(y)
+        #y_size = len(y)
         y.sort()
-        jump = []
-        for i in range(1, y_size):
-            if y[i] - y[i-1] > 1:
-                jump.append(y[i] - y[i-1])
+        #jump = []
+        #for i in range(1, y_size):
+        #    if y[i] - y[i-1] > 1:
+        #        jump.append(y[i] - y[i-1])
 
-        lower_outlier = []
-        upper_outlier = []
-        #print("jump", jump)
-        #print("tail", y)
+        #lower_outlier = []
+        #upper_outlier = []
+        ##print("jump", jump)
+        ##print("tail", y)
 
-        if jump != []:
-            s_avg = np.average(jump)
-            s_std = np.std(jump)
-            #print('avg', s_avg)
-            #print('std', s_std)
-            #print(jump)
-            n_jump = len(jump)
-            for i in range(1, y_size//2):
-                if y[i] - y[i-1] > s_avg + 10 * (s_std / np.sqrt(n_jump) ) + self.epsilon:
-                    lower_outlier.append(i-1)
-                    break
-            for i in range(y_size-1, y_size//2, -1):
-                if y[i] - y[i-1] > s_avg + 10 * ( s_std / np.sqrt(n_jump) ) + self.epsilon:
-                    upper_outlier.append(i)
-                    break
+        #if jump != []:
+        #    s_avg = np.average(jump)
+        #    s_std = np.std(jump)
+        #    #print('avg', s_avg)
+        #    #print('std', s_std)
+        #    #print(jump)
+        #    n_jump = len(jump)
+        #    for i in range(1, y_size//2):
+        #        if y[i] - y[i-1] > s_avg + 10 * (s_std / np.sqrt(n_jump) ) + self.epsilon:
+        #            lower_outlier.append(i-1)
+        #            break
+        #    for i in range(y_size-1, y_size//2, -1):
+        #        if y[i] - y[i-1] > s_avg + 10 * ( s_std / np.sqrt(n_jump) ) + self.epsilon:
+        #            upper_outlier.append(i)
+        #            break
 
-        if lower_outlier == []:
-            lower_outlier.append(0)
-        if upper_outlier == []:
-            upper_outlier.append( y_size-1 )
+        #if lower_outlier == []:
+        #    lower_outlier.append(0)
+        #if upper_outlier == []:
+        #    upper_outlier.append( y_size-1 )
         
-        print("outliers:", y[0], y[lower_outlier[0]], y[upper_outlier[0]], y[-1])
-        return y[0], y[lower_outlier[0]], y[upper_outlier[0]], y[-1]
+        #print("outliers:", y[0], y[lower_outlier[0]], y[upper_outlier[0]], y[-1])
+        #return y[0], y[lower_outlier[0]], y[upper_outlier[0]], y[-1]
+        return y[0], y[0], y[-1], y[-1]
 
 
     def dft_dispersion_measures(self, y):
@@ -193,17 +195,17 @@ class VibCharts:
 
                 self.numVibrations += 1
             text_file.close()
-            # time vector
-            self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False)
             # Duration in seconds
             self.duration = self.numVibrations / self.sampleRate
+            # time vector
+            self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False)
 
         else:
 
             for part in range(self.dxdPart[0], self.dxdPart[1]+1):
                 file_name = self.path + str(self.coleta) + "/Dados/faceamento " + str(self.test) + "_{:04d}.dxd".format(part)
 
-                print(file_name)
+                #print(file_name)
                 with dw.open( file_name ) as f:
                     canais = []
                     canal = [[],[],[]]
@@ -328,7 +330,7 @@ class VibCharts:
             sensor = int(row_text[2])
 
             if self.test == int(row_text[1]) and iteration == self.dxdPart[0]:
-                self.vib_rms = float(row_text[5])
+                self.vib_rms[sensor-1] = float(row_text[5])
             lower_vib[sensor-1].append(float(row_text[13]))
             upper_vib[sensor-1].append(float(row_text[14]))
             upper_dft[sensor-1].append(float(row_text[16]))
@@ -340,7 +342,7 @@ class VibCharts:
             self.vib_lower[sensor-1], blank = self.extValues_normalityBand(lower_vib[sensor-1])
             blank, self.vib_upper[sensor-1] = self.extValues_normalityBand(upper_vib[sensor-1])
             blank, self.dft_upper[sensor-1] = self.extValues_normalityBand(upper_dft[sensor-1])
-            print(self.vib_lower[sensor-1], self.vib_upper[sensor-1], self.dft_upper[sensor-1] )
+            #print(self.vib_lower[sensor-1], self.vib_upper[sensor-1], self.dft_upper[sensor-1] )
             
 
 
@@ -357,6 +359,127 @@ class VibCharts:
         #plt.ylim( 0, 0.03 )
         plt.grid( True )
         plt.show( )
+
+    
+    def plotBars( self ):
+        rms = [[],[],[]]
+        label = []
+
+        self.create_directory("Charts")
+
+        # Read data
+        text_file = open(self.path + str(self.coleta) + "/Data/data_" + self.unit + ".txt", "r")
+        for line in text_file:
+            row_text = line.split(";")
+            label.append(row_text[1])
+            sensor = int(row_text[2])
+            rms[sensor-1].append(float(row_text[5]))
+
+        N = len(rms[0])
+        label = list(set(label))
+        label.sort()
+
+        plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
+        title = "RMS na coleta " + str(self.coleta)
+        plt.title( title, fontsize = 15)
+
+        x = np.arange(N)
+
+        legend = []
+        for sensor in self.Sensores:
+            legend.append("Sensor " + str(sensor))
+            if sensor == 1:
+                if len(Sensores) != 1:
+                    plt.bar(x - 0.2, rms[sensor-1], 0.2, color=self.Colors[sensor-1])
+                else:
+                    plt.bar(x, rms[sensor-1], 0.2, color=self.Colors[sensor-1])
+            if sensor == 2:
+                plt.bar(x, rms[sensor-1], 0.2, color=self.Colors[sensor-1])
+            if sensor == 3:
+                plt.bar(x + 0.2, rms[sensor-1], 0.2, color=self.Colors[sensor-1])
+        
+        plt.xticks(x, label)
+        plt.xlabel("testes", fontsize=15, labelpad=10)
+        plt.ylabel(self.yLabel[self.unit], fontsize=15, labelpad=10)
+        plt.legend( legend )
+        plt.grid( linestyle='--', axis='y' )
+        figpath = self.path + str(self.coleta) + '/Charts/BarC' + str(self.coleta) + self.unit
+        plt.savefig( figpath + '.png' )
+        plt.close()
+        plt.cla()
+        plt.clf()
+
+
+
+    def buildTable(self):
+
+        num_test = [[],[],[]]
+        num_lines = [[],[],[]]
+        duration = [[],[],[]]
+        sensores = [[],[],[]]
+        rms = [[],[],[]]
+        vib_min = [[],[],[]]
+        vib_max = [[],[],[]]
+        dft_max = [[],[],[]]
+
+        self.create_directory("Data")
+
+        # Read data
+        text_file = open(self.path + str(self.coleta) + "/Data/data_" + self.unit + ".txt", "r")
+        for line in text_file:
+            row_text = line.split(";")
+            sensor = int(row_text[2])
+
+            num_test[sensor-1].append(int(row_text[1]))
+            num_lines[sensor-1].append(int(row_text[3]))
+            duration[sensor-1].append(float(row_text[4]))
+            sensores[sensor-1].append(int(row_text[2]))
+            rms[sensor-1].append(float(row_text[5]))
+            vib_min[sensor-1].append(float(row_text[12]))
+            vib_max[sensor-1].append(float(row_text[15]))
+            dft_max[sensor-1].append(float(row_text[17]))
+        text_file.close()
+
+        N = len(rms[0])
+
+        with open(self.path + str(self.coleta) + "/Data/table_" + self.unit + ".tex", "w") as f:
+            for i in range(N):
+                f.write("\\midrule\n")
+                for sensor in self.Sensores[:1]:
+                    f.write("{:2d}".format(num_test[sensor-1][i]) + 
+                            " & {:10,d}".format(num_lines[sensor-1][i]).replace(',','.') + 
+                            " & {:10.2f}".format(duration[sensor-1][i]).replace('.',',') + 
+                            " & {:2d}".format(sensores[sensor-1][i]) + 
+                            " & {:7.2f}".format(rms[sensor-1][i]).replace('.',',') + 
+                            " & {:7.2f}".format(vib_min[sensor-1][i]).replace('.',',') + 
+                            " & {:7.2f}".format(vib_max[sensor-1][i]).replace('.',',') + 
+                            " & {:7.2f}".format(dft_max[sensor-1][i]).replace('.',',') + 
+                            " \\\\ \n")
+                for sensor in self.Sensores[1:]:
+                    f.write("  " + 
+                            " &           " +
+                            " &           " +
+                            " & {:2d}".format(sensores[sensor-1][i]) + 
+                            " & {:7.2f}".format(rms[sensor-1][i]).replace('.',',') + 
+                            " & {:7.2f}".format(vib_min[sensor-1][i]).replace('.',',') + 
+                            " & {:7.2f}".format(vib_max[sensor-1][i]).replace('.',',') + 
+                            " & {:7.2f}".format(dft_max[sensor-1][i]).replace('.',',') + 
+                            " \\\\ \n")
+
+            f.write("\\midrule\n")
+            f.write("\\midrule\n")
+            f.write("\\multicolumn{3}{c}{\\multirow{3}{*}{Geral de 1 até " + str(num_test[0][-1]) + "}}\n")
+            for sensor in self.Sensores:
+                f.write("  " + 
+                        "             " +
+                        "             " +
+                        " & {:2d}".format(sensores[sensor-1][i]) + 
+                        " & {:7.2f}".format(np.max(rms[sensor-1])).replace('.',',') + 
+                        " & {:7.2f}".format(np.min(vib_min[sensor-1])).replace('.',',') + 
+                        " & {:7.2f}".format(np.max(vib_max[sensor-1])).replace('.',',') + 
+                        " & {:7.2f}".format(np.max(dft_max[sensor-1])).replace('.',',') + 
+                        " \\\\ \n")
+                   
 
     
     def plotVibration( self, sensor, details = False ):
@@ -391,11 +514,16 @@ class VibCharts:
                 Dets = 'D'
 
             plt.ylabel( self.yLabel[self.unit] )
-            plt.legend( self.Legend[sensor-1] )
+            
+            if details == True:
+                plt.legend( self.Legend[sensor-1] + ['RMS'] )
+            else:
+                plt.legend( self.Legend[sensor-1] )
+
             plt.xlabel( "Tempo (s)" )
             plt.grid( linestyle='--', axis='y' )
 
-            figpath = self.path + str(self.coleta) + '/Charts/VibT' + str(self.test) + 'S' + str(sensor + Dets)
+            figpath = self.path + str(self.coleta) + '/Charts/VibT' + str(self.test) + 'S' + str(sensor) + Dets
             if self.coleta != 11 and self.coleta != 12:
                 plt.savefig( figpath + self.unit + '.png' )
             else:
@@ -437,7 +565,6 @@ class VibCharts:
         N, xf, yf = self.DFTNormalized(y_)
 
         for freq in self.Frequence:
-
             plt.rc('font', **{'size' : 18})
             plt.ticklabel_format(style = 'plain')
             plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
@@ -451,7 +578,7 @@ class VibCharts:
                 else:
                     plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
             
-            plt.plot( xf[:int(N * (2000*freq/self.sampleRate))], yf[:int(N * (2000*freq/self.sampleRate))], self.Colors[sensor-1])
+            plt.plot( xf[:int(N * ((2000*freq) / self.sampleRate))], yf[:int(N * (2000*freq/self.sampleRate))], self.Colors[sensor-1] )
             
             
             Dets = ''
@@ -464,18 +591,17 @@ class VibCharts:
 
             plt.ylabel( self.yLabel[self.unit] )
             plt.legend( self.Legend[sensor-1] )
-            plt.xlabel( "Tempo (s)" )
-            plt.grid( linestyle='--', axis='y' )
 
             figpath = self.path + str(self.coleta) + '/Charts/DFT' + str(freq) + 'kT' + str(self.test) + 'S' + str(sensor) + Dets
             if self.coleta != 11 and self.coleta != 12:
                 plt.savefig( figpath + self.unit + '.png' )
             else:
                 plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
-
             plt.close()
             plt.cla()
             plt.clf()
+
+
 
 
 
@@ -560,23 +686,24 @@ class VibCharts:
 if __name__ == '__main__':
 
     #Data
+    Sensores = [1,2,3]
     for coleta in [15]:
-        Sensores = [1,2,3]
+        #for test in [31, 32, 34]:
+        #    v = VibCharts(coleta, test, Sensores)
+        #    v.getSummaryData()
+        #    print("GetParameters - Coleta", coleta, "Test", test)
 
-        for test in range(1,35):
-            v = VibCharts(coleta, test, Sensores)
-            v.getSummaryData()
-            print("GetParameters - Coleta", coleta, "Test", test)
-
-        for test in range(1,35):
+        for test in [12, 13, 14, 15, 16, 17, 18, 19, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 34]:
             v = VibCharts(coleta, test, Sensores)
             v.getVibrations()
             v.setParameters()
+            #v.plotBars()
+            #v.buildTable()
             for sensor in Sensores:
                 v.plotVibration(sensor, True)
-                v.plotVibration(sensor, False)
+                #v.plotVibration(sensor, False)
                 v.plotDFT(sensor, True)
-                v.plotDFT(sensor, False)
+                #v.plotDFT(sensor, False)
                 print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
 
            
