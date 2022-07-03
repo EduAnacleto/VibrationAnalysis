@@ -884,9 +884,9 @@ class VibCharts:
         numVibrations = 0
         duration = 0
         rms = 0
-        vib_min = 0 
-        vib_max = 0 
-        dft_max = 0 
+        vib_min = 0
+        vib_max = 0
+        dft_max = 0
         with open(self.pathData + "/detaileddata_" + self.unit + ".txt", "r") as text_file:
             num_passada = 0
             for line in text_file:
