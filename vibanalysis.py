@@ -215,7 +215,7 @@ class VibCharts:
                 next( text_file )
             self.numVibrations = 0;
             for line in text_file:
-                row_text = line.split(";")
+                row_text = line.split(';')
                 for s in self.Sensores:
                     self.Vibrations[s-1].append( float(row_text[s]))
 
@@ -876,7 +876,142 @@ class VibCharts:
             self.vib_lower[sensor-1], blank = self.extValues_normalityBand(lower_vib[sensor-1])
             blank, self.vib_upper[sensor-1] = self.extValues_normalityBand(upper_vib[sensor-1])
             blank, self.dft_upper[sensor-1] = self.extValues_normalityBand(upper_dft[sensor-1])
+    
 
+    def importPassadaData(self, teste, sensor, faceamento, passada, passada_por_faceamento): 
+        id_passada = passada + (faceamento-1)*passada_por_faceamento
+
+        numVibrations = 0
+        duration = 0
+        rms = 0
+        vib_min = 0 
+        vib_max = 0 
+        dft_max = 0 
+        with open(self.pathData + "/detaileddata_" + self.unit + ".txt", "r") as text_file:
+            num_passada = 0
+            for line in text_file:
+                row_text = line.split(';')
+                
+                if teste != int(row_text[1]):
+                    continue
+                if sensor != int(row_text[2]):
+                    continue
+                if int(row_text[3]) != 1:
+                    continue
+
+                num_passada += 1
+                if id_passada != num_passada:
+                    continue
+
+                numVibrations = int(row_text[4])
+                duration = float(row_text[5])
+                rms = float(row_text[6])
+                vib_min = float(row_text[7])
+                vib_max = float(row_text[10])
+                dft_max = float(row_text[12])
+                break
+
+        return numVibrations, duration, rms, vib_min, vib_max, dft_max
+
+    
+    def exportTrainingDataSet(self):
+        # This functions may be used to merge the files 'detaliedData' and 'PotenciaPorPassada'
+        
+        arq1_title = ''
+        arq1_blocoOrigem = []
+        arq1_bloco = []
+        arq1_teste = []
+        arq1_faceamento = []
+        arq1_passada = []
+        arq1_potenciaMediaObservada = []
+        arq1_desgasteAntes = []
+        arq1_desgasteDepois = []
+        with open(self.pathData + "/PotenciaDesgastePorPassada.txt", "r") as text_file:
+            line = next(text_file)
+            arq1_title = line.split(";")
+            for line in text_file:
+                row_text = line.split(';')
+                arq1_blocoOrigem.append(str(row_text[0]))
+                arq1_bloco.append(int(row_text[1]))
+                arq1_teste.append(int(row_text[2]))
+                arq1_faceamento.append(int(row_text[3]))
+                arq1_passada.append(int(row_text[4]))
+                arq1_potenciaMediaObservada.append(int(row_text[5]))
+                arq1_desgasteAntes.append(row_text[6].strip())
+                arq1_desgasteDepois.append(row_text[7].strip())
+
+        N1 = len(arq1_teste)
+        
+        
+        arq2_teste = []
+        arq2_sensor = []
+        arq2_tipo_movimento = []
+        arq2_numVibrations = []
+        arq2_duration = []
+        arq2_rms = []
+        arq2_vib_min = []
+        arq2_vib_max = []
+        with open(self.pathData + "/detaileddata_" + self.unit + ".txt", "r") as text_file:
+            for line in text_file:
+                row_text = line.split(';')
+                arq2_teste.append(int(row_text[1]))
+                arq2_sensor.append(int(row_text[2]))
+                arq2_tipo_movimento.append(int(row_text[3]))
+                arq2_numVibrations.append(int(row_text[4]))
+                arq2_duration.append(float(row_text[5]))
+                arq2_rms.append(float(row_text[6]))
+                arq2_vib_min.append(float(row_text[7]))
+                arq2_vib_max.append(float(row_text[10]))
+        N2 = len(arq2_teste)
+        
+
+        with open(self.pathData + "/trainingDataSet_" + self.unit + ".txt", "w") as f:
+            
+            f.write("coleta; "+
+                    "blocoOrigem; " +
+                    "bloco; " +
+                    "teste; " +
+                    "sensor; " +
+                    "faceamento; " +
+                    "passada; " +
+                    "numVibrations; " +
+                    "duration; " +
+                    "RMS; " +
+                    "vibMax; " +
+                    "vibMin; " +
+                    "dftMax; " +
+                    "potencia; " +
+                    "desgasteAntes; " +
+                    "desgasteDepois; " +
+                    "\n")
+
+            for i in range(N1):                
+                for sensor in self.Sensores:
+                    numVibrations, \
+                    duration, \
+                    rms, \
+                    vib_min, \
+                    vib_max, \
+                    dft_max = self.importPassadaData(arq1_teste[i], sensor, arq1_faceamento[i], arq1_passada[i], 6)
+
+                    f.write("{:2d};".format(self.coleta) +
+                        " {:2s};".format(arq1_blocoOrigem[i]) +
+                        " {:2d};".format(arq1_bloco[i]) + 
+                        " {:2d};".format(arq1_teste[i]) + 
+                        " {:2d};".format(sensor) + 
+                        " {:2d};".format(arq1_faceamento[i]) + 
+                        " {:2d};".format(arq1_passada[i]) + 
+                        " {:10d};".format(numVibrations) + 
+                        " {:10.5f};".format(duration) + 
+                        " {:10.5f};".format(rms) + 
+                        " {:10.5f};".format(vib_min) + 
+                        " {:10.5f};".format(vib_max) + 
+                        " {:10.5f};".format(dft_max) + 
+                        " {:3d};".format(arq1_potenciaMediaObservada[i]) + 
+                        " {:4s};".format(arq1_desgasteAntes[i]) + 
+                        " {:4s};".format(arq1_desgasteDepois[i]) +
+                        "\n")
+                    
 
 
 
@@ -884,14 +1019,16 @@ if __name__ == '__main__':
 
     #Data
     Sensores = [1,2,3]
-    for coleta in [15]:
-        for test in range(1, 35):
-            if test == 21 or test == 22 or test == 33:
-                continue
-            v = VibCharts(coleta, test, Sensores)
-            v.exportData(True, True)
-            v.exportDetailedData()
-            print("Export Data - Coleta", coleta, "Test", test)
+    v = VibCharts(15, 1, Sensores)
+    v.exportTrainingDataSet()
+    #for coleta in [15]:
+    #    for test in range(1, 35):
+    #        if test == 21 or test == 22 or test == 33:
+    #            continue
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
 
         #for test in range(1, 35):
         #    if test == 21 or test == 22 or test == 33:
