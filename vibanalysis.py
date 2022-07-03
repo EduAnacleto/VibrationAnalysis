@@ -846,9 +846,6 @@ class VibCharts:
 
         if self.numParts[sensor-1] == 0:
             text_file = open(self.pathData + "/VibPartsT" + str(self.test) + "S" + str(sensor) + ".txt", "r")
-            #N = len(text_file)
-            # número de passadas
-            
             line = next (text_file)
             row_text = line.split(";")
             self.numParts[sensor-1] = int(row_text[0])
@@ -856,7 +853,7 @@ class VibCharts:
             for line in text_file:
                 row_text = line.split(";")
                 self.parts[sensor-1].append([int(row_text[0]), int(row_text[1]), int(row_text[2])])
-                self.numPassadas += self.parts[sensor-1][0]
+                self.numPassadas[sensor-1] += int(row_text[0])
 
     
     def importLUData(self):
@@ -879,7 +876,6 @@ class VibCharts:
             self.vib_lower[sensor-1], blank = self.extValues_normalityBand(lower_vib[sensor-1])
             blank, self.vib_upper[sensor-1] = self.extValues_normalityBand(upper_vib[sensor-1])
             blank, self.dft_upper[sensor-1] = self.extValues_normalityBand(upper_dft[sensor-1])
-
 
 
 
