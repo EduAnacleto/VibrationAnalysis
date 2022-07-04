@@ -33,7 +33,8 @@ class VibCharts:
         self.pathCharts = self.pathColeta + "/Charts"
         self.pathChartsParts = self.pathColeta + "/ChartsParts"
 
-        self.Colors = ['blue', 'red', 'green']
+        #self.Colors = ['blue', 'red', 'green']
+        self.Colors = ['cornflowerblue', 'lightcoral', 'yellowgreen']
         self.Legend = [['Sensor 1'], ['Sensor 2'], ['Sensor 3']]
         self.yLabel = dict()
         self.yLabel['a'] = "Aceleração (m/s^2)"
@@ -445,9 +446,9 @@ class VibCharts:
             if sensor == 3:
                 plt.bar(x + 0.2, rms[sensor-1], 0.2, color=self.Colors[sensor-1])
         
-        plt.xticks(x, label)
-        plt.xlabel("testes", fontsize=15, labelpad=10)
-        plt.ylabel(self.yLabel[self.unit], fontsize=15, labelpad=10)
+        plt.xticks(x, label )
+        plt.xlabel("testes", fontsize=15, labelpad=10 )
+        plt.ylabel(self.yLabel[self.unit], fontsize=15, labelpad=10 )
         plt.legend( legend )
         plt.grid( linestyle='--', axis='y' )
         figpath = self.pathCharts + '/BarC' + str(self.coleta) + self.unit
@@ -455,6 +456,163 @@ class VibCharts:
         plt.close()
         plt.cla()
         plt.clf()
+
+    def plotBarsPassadasRMS( self ):
+        
+        rms_passadas = [
+            [[],[],[],[],[],[]],
+            [[],[],[],[],[],[]],
+            [[],[],[],[],[],[]]
+            ]
+        
+        rms_max = 0
+        label = [[],[],[]]
+        with open( self.pathData + "/trainingDataSet_a.txt", "r") as text_file:
+            line = next(text_file)
+            for line in text_file:
+                row_text = line.split(";")
+                sensor = int(row_text[4])
+                passada = int(row_text[6])
+                rms = float(row_text[9])
+                if rms > rms_max:
+                    rms_max = rms
+                rms_passadas[sensor-1][passada-1].append(rms)
+                
+                if passada == 1:
+                    label[sensor-1].append(str(int(row_text[3])) + "-" + str(int(row_text[5])))
+
+        N = len(rms_passadas[0][0])
+        x = np.arange(N)
+        #label = [str(i+1) for i in range(N)]
+
+
+        for sensor in self.Sensores:
+            #plt.figure( figsize= (self.largura*1.1, self.altura*1.3), dpi= self.my_dpi )
+            #title = "RMS na coleta " + str(self.coleta)
+            #plt.title( title, fontsize = 25 )
+
+            #plt.bar( x-0.25, rms_passadas[sensor-1][0], 0.1, color=self.Colors[sensor-1])
+            #plt.bar( x-0.15, rms_passadas[sensor-1][1], 0.1, color=self.Colors[sensor-1])
+            #plt.bar( x-0.05, rms_passadas[sensor-1][2], 0.1, color=self.Colors[sensor-1])
+            #plt.bar( x+0.05, rms_passadas[sensor-1][3], 0.1, color=self.Colors[sensor-1])
+            #plt.bar( x+0.15, rms_passadas[sensor-1][4], 0.1, color=self.Colors[sensor-1])
+            #plt.bar( x+0.25, rms_passadas[sensor-1][5], 0.1, color=self.Colors[sensor-1])
+            #plt.plot([0], [0], marker = 'o', markersize=10, color='black', linestyle="None")
+
+            #plt.xticks( x, label[sensor-1], rotation=90, fontsize = 15 )
+            #plt.xlabel( "teste - faceamento", fontsize=25, labelpad=10 )
+            #plt.ylabel( self.yLabel[self.unit], fontsize=25, labelpad=10 )
+            #plt.ylim( -1, rms_max*1.1)
+            #plt.legend( ['Desgaste', 'Sensor ' + str(sensor)], fontsize = 15 )
+            #plt.grid( linestyle='--', axis='y' )
+            #figpath = self.pathCharts + '/BarPassadasC' + str(self.coleta) + 'S' + str(sensor) + self.unit
+            #plt.savefig( figpath + '.png' )
+            #plt.close()
+            #plt.cla()
+            #plt.clf()
+
+
+            #plt.figure( figsize= (self.largura*1.1, self.altura*1.3), dpi= self.my_dpi )
+            #title = "RMS na coleta " + str(self.coleta)
+            #plt.title( title, fontsize = 25 )
+
+            fig, ax1 = plt.subplots(figsize= (self.largura, self.altura), dpi= self.my_dpi)
+            ax2 = ax1.twinx()
+            fig.subplots_adjust(bottom=0.2)
+
+            title = "RMS na coleta " + str(self.coleta)
+            plt.title( title, fontsize = 15 )
+
+            ax1.bar( x-0.25, rms_passadas[sensor-1][0], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x-0.15, rms_passadas[sensor-1][1], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x-0.05, rms_passadas[sensor-1][2], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x+0.05, rms_passadas[sensor-1][3], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x+0.15, rms_passadas[sensor-1][4], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x+0.25, rms_passadas[sensor-1][5], 0.1, color=self.Colors[sensor-1])
+            ax2.plot([0, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
+
+            plt.setp(ax1, xticks=x)
+            plt.setp(ax2, xticks=x)
+            ax1.set_xticklabels(label[sensor-1], rotation=90, fontsize=12)
+            ax1.set_xlabel("teste - faceamento", fontsize=15, labelpad=10 )
+            ax1.set_ylabel( self.yLabel[self.unit], fontsize=15, labelpad=10 )
+            ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
+            ax1.set_ylim( 0, rms_max*1.1)
+            ax2.set_ylim(-0.02, 0.7)
+            ax1.legend( ['Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
+            ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
+            plt.grid( linestyle='--', axis='y' )
+            figpath = self.pathCharts + '/BarPassadasC' + str(self.coleta) + 'S' + str(sensor) + self.unit
+            plt.savefig( figpath + '.png' )
+            plt.close()
+            plt.cla()
+            plt.clf()
+
+      
+    def plotBarsPassadasPower( self ):
+        
+        potencia_passadas = [
+            [[],[],[],[],[],[]],
+            [[],[],[],[],[],[]],
+            [[],[],[],[],[],[]]
+            ]
+        
+        potencia_max = 0
+        label = [[],[],[]]
+        with open( self.pathData + "/trainingDataSet_a.txt", "r") as text_file:
+            line = next(text_file)
+            for line in text_file:
+                row_text = line.split(";")
+                sensor = int(row_text[4])
+                passada = int(row_text[6])
+                potencia = float(row_text[13])
+                if potencia > potencia_max:
+                    potencia_max = potencia
+                potencia_passadas[sensor-1][passada-1].append(potencia)
+                
+                if passada == 1:
+                    label[sensor-1].append(str(int(row_text[3])) + "-" + str(int(row_text[5])))
+
+        N = len(potencia_passadas[0][0])
+        x = np.arange(N)
+
+        for sensor in self.Sensores:
+            fig, ax1 = plt.subplots(figsize= (self.largura, self.altura), dpi= self.my_dpi)
+            ax2 = ax1.twinx()
+            fig.subplots_adjust(bottom=0.2)
+
+            title = "Potência por desgaste na coleta " + str(self.coleta)
+            plt.title( title, fontsize = 15 )
+
+            ax1.bar( x-0.25, potencia_passadas[sensor-1][0], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x-0.15, potencia_passadas[sensor-1][1], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x-0.05, potencia_passadas[sensor-1][2], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x+0.05, potencia_passadas[sensor-1][3], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x+0.15, potencia_passadas[sensor-1][4], 0.1, color=self.Colors[sensor-1])
+            ax1.bar( x+0.25, potencia_passadas[sensor-1][5], 0.1, color=self.Colors[sensor-1])
+            ax2.plot([0, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
+
+            plt.setp(ax1, xticks=x)
+            plt.setp(ax2, xticks=x)
+            ax1.set_xticklabels(label[sensor-1], rotation=90, fontsize=12)
+            ax1.set_xlabel("teste - faceamento", fontsize=15, labelpad=10 )
+            ax1.set_ylabel( 'Potência', fontsize=15, labelpad=10 )
+            ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
+            ax1.set_ylim( 0, potencia_max*1.1)
+            ax2.set_ylim(-0.02, 0.7)
+            ax1.legend( ['Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
+            ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
+            plt.grid( linestyle='--', axis='y' )
+            figpath = self.pathCharts + '/BarPassadasPotenciaC' + str(self.coleta) + 'S' + str(sensor) + self.unit
+            plt.savefig( figpath + '.png' )
+            plt.close()
+            plt.cla()
+            plt.clf()
+
+
+                
+                
+        
 
 
 
@@ -1020,7 +1178,9 @@ if __name__ == '__main__':
     #Data
     Sensores = [1,2,3]
     v = VibCharts(15, 1, Sensores)
-    v.exportTrainingDataSet()
+    #v.exportTrainingDataSet()
+    v.plotBarsPassadasRMS()
+    v.plotBarsPassadasPower()
     #for coleta in [15]:
     #    for test in range(1, 35):
     #        if test == 21 or test == 22 or test == 33:
