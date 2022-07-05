@@ -419,15 +419,18 @@ class VibCharts:
         text_file = open(self.pathData + "/data_" + self.unit + ".txt", "r")
         for line in text_file:
             row_text = line.split(";")
-            label.append(row_text[1])
+            #label.append(row_text[1])
             sensor = int(row_text[2])
             rms[sensor-1].append(float(row_text[5]))
+
+            if self.Sensores[0] == sensor:
+
 
         N = len(rms[0])
         label = list(set(label))
         label.sort()
 
-        plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
+        plt.figure( figsize = (self.largura, self.altura), dpi= self.my_dpi )
         title = "RMS na coleta " + str(self.coleta)
         plt.title( title, fontsize = 15)
 
@@ -1224,9 +1227,10 @@ if __name__ == '__main__':
     Sensores = [1,2,3]
     v = VibCharts(15, 1, Sensores)
     #v.exportTrainingDataSet()
-    v.plotBarsPassadasRMS()
-    v.plotBarsFaceamentosRMS()
-    v.plotBarsPassadasPower()
+    v.plotBars()
+    #v.plotBarsPassadasRMS()
+    #v.plotBarsFaceamentosRMS()
+    #v.plotBarsPassadasPower()
     #for coleta in [15]:
     #    for test in range(1, 35):
     #        if test == 21 or test == 22 or test == 33:
