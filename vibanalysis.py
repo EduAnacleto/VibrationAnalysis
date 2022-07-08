@@ -204,6 +204,55 @@ class VibCharts:
         return self.Sensores[0]-1
 
 
+    def determineVibRange(self, sensor, test, faceamento, passada, move_vazio = False, passada_por_faceamento = 6):
+        
+        position = []
+        start_position = 0
+        end_position = 0
+        with open( self.pathData + "/VibPartsT" + str(test) + "S" + str(sensor) + ".txt", "r" ) as text_file:
+            if passada == 0:
+                first_passada = (faceamento-1) * passada_por_faceamento + 1
+                last_passada = faceamento * passada_por_faceamento
+                
+                line = next(text_file)
+                count_passada = 0
+                for line in text_file:
+                    row_text = line.split(';')
+                    if move_vazio == False:
+                        if int(row_text[0]) == 1:
+                            count_passada += 1
+                            if count_passada >= first_passada and count_passada <= last_passada:
+                                position.append([int(row_text[1]), int(row_text[2])])
+                    else:
+                        if int(row_text[0]) == 1:
+                            count_passada += 1
+                            if count_passada == first_passada:
+                                start_position = int(row_text[1])
+                            if count_passada == last_passada:
+                                end_position = int(row_text[2])
+
+                if move_vazio == True:
+                    position.append([start_position, end_position])
+
+            else:
+                p_passada = (faceamento - 1) * passada_por_faceamento + passada
+                
+                line = next( text_file )
+                count_passada = 0
+                for line in text_file:
+                    row_text = line.split(';')
+                    if int(row_text[0]) == 1:
+                        count_passada += 1
+                        if count_passada == p_passada:
+                            start_position = int(row_text[1])
+                            end_position = int(row_text[2])
+                            break
+                position.append([start_position, end_position])
+
+        return position
+
+
+
     def getVibrations(self):
 
         if self.coleta != 11 and self.coleta != 12:
@@ -423,9 +472,6 @@ class VibCharts:
             sensor = int(row_text[2])
             rms[sensor-1].append(float(row_text[5]))
 
-            if self.Sensores[0] == sensor:
-
-
         N = len(rms[0])
         label = list(set(label))
         label.sort()
@@ -476,6 +522,9 @@ class VibCharts:
         
         rms_max = 0
         label = [[],[],[]]
+        block_change = []
+        bc = 1
+        count = 0
         with open( self.pathData + "/trainingDataSet_a.txt", "r") as text_file:
             line = next(text_file)
             for line in text_file:
@@ -484,6 +533,7 @@ class VibCharts:
                 passada = int(row_text[6])
                 records = int(row_text[7])
                 rms = float(row_text[9])
+                block = int(row_text[2])
                 if rms > rms_max:
                     rms_max = rms
                 rms_passadas[sensor-1][passada-1].append(rms)
@@ -491,8 +541,16 @@ class VibCharts:
                 
                 if passada == 1:
                     label[sensor-1].append(str(int(row_text[3])) + "-" + str(int(row_text[5])))
+
+                    if sensor == self.Sensores[0]:
+                        if block != bc:
+                            bc = block
+                            block_change.append(count)
+                        count += 1
+
         N = len(rms_passadas[0][0])
         x = np.arange(N)
+
 
         # construct rms faceamentos
         rms_faceamentos = [[],[],[]]
@@ -518,7 +576,9 @@ class VibCharts:
             title = "RMS por faceamento e desgaste na coleta " + str(self.coleta)
             plt.title( title, fontsize = 15 )
 
-            ax1.bar( x, rms_faceamentos[sensor-1], 0.6, color=self.Colors[sensor-1])
+            colors = [self.Colors[sensor-1] if i not in block_change else 'gray' for i in range(N)]
+
+            ax1.bar( x, rms_faceamentos[sensor-1], 0.6, color=colors)
             ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
 
             plt.setp(ax1, xticks=x)
@@ -549,6 +609,9 @@ class VibCharts:
         
         rms_max = 0
         label = [[],[],[]]
+        block_change = []
+        bc = 1
+        count = 0
         with open( self.pathData + "/trainingDataSet_a.txt", "r") as text_file:
             line = next(text_file)
             for line in text_file:
@@ -556,14 +619,23 @@ class VibCharts:
                 sensor = int(row_text[4])
                 passada = int(row_text[6])
                 rms = float(row_text[9])
+                block = int(row_text[2])
                 if rms > rms_max:
                     rms_max = rms
                 rms_passadas[sensor-1][passada-1].append(rms)
                 
                 if passada == 1:
                     label[sensor-1].append(str(int(row_text[3])) + "-" + str(int(row_text[5])))
+
+                    if sensor == self.Sensores[0]:
+                        if block != bc:
+                            bc = block
+                            block_change.append(count)
+                        count += 1
+            
         N = len(rms_passadas[0][0])
         x = np.arange(N)
+
 
         for sensor in self.Sensores:
             fig, ax1 = plt.subplots(figsize= (self.largura, self.altura), dpi= self.my_dpi)
@@ -573,12 +645,14 @@ class VibCharts:
             title = "RMS por passada, faceamento e desgaste na Coleta " + str(self.coleta)
             plt.title( title, fontsize = 15 )
 
-            ax1.bar( x-0.25, rms_passadas[sensor-1][0], 0.1, color=self.Colors[sensor-1])
-            ax1.bar( x-0.15, rms_passadas[sensor-1][1], 0.1, color=self.Colors[sensor-1])
-            ax1.bar( x-0.05, rms_passadas[sensor-1][2], 0.1, color=self.Colors[sensor-1])
-            ax1.bar( x+0.05, rms_passadas[sensor-1][3], 0.1, color=self.Colors[sensor-1])
-            ax1.bar( x+0.15, rms_passadas[sensor-1][4], 0.1, color=self.Colors[sensor-1])
-            ax1.bar( x+0.25, rms_passadas[sensor-1][5], 0.1, color=self.Colors[sensor-1])
+            colors = [self.Colors[sensor-1] if i not in block_change else 'gray' for i in range(N)]
+
+            ax1.bar( x-0.25, rms_passadas[sensor-1][0], 0.1, color=colors)
+            ax1.bar( x-0.15, rms_passadas[sensor-1][1], 0.1, color=colors)
+            ax1.bar( x-0.05, rms_passadas[sensor-1][2], 0.1, color=colors)
+            ax1.bar( x+0.05, rms_passadas[sensor-1][3], 0.1, color=colors)
+            ax1.bar( x+0.15, rms_passadas[sensor-1][4], 0.1, color=colors)
+            ax1.bar( x+0.25, rms_passadas[sensor-1][5], 0.1, color=colors)            
             ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
 
             plt.setp(ax1, xticks=x)
@@ -592,6 +666,7 @@ class VibCharts:
             ax1.legend( ['Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
             ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
             plt.grid( linestyle='--', axis='y' )
+            
             figpath = self.pathCharts + '/BarPassadasC' + str(self.coleta) + 'S' + str(sensor) + self.unit
             plt.savefig( figpath + '.png' )
             plt.close()
@@ -608,6 +683,9 @@ class VibCharts:
         
         power_max = 0
         label = [[],[],[]]
+        block_change = []
+        bc = 1
+        count = 0
         with open( self.pathData + "/trainingDataSet_a.txt", "r") as text_file:
             line = next(text_file)
             for line in text_file:
@@ -615,6 +693,7 @@ class VibCharts:
                 sensor = int(row_text[4])
                 passada = int(row_text[6])
                 power = float(row_text[13])
+                block = int(row_text[2])
                 if power > power_max:
                     power_max = power
                 power_passadas[sensor-1][passada-1].append(power)
@@ -622,10 +701,18 @@ class VibCharts:
                 if passada == 1:
                     label[sensor-1].append(str(int(row_text[3])) + "-" + str(int(row_text[5])))
 
+                    if sensor == self.Sensores[0]:
+                        if block != bc:
+                            bc = block
+                            block_change.append(count)
+                        count += 1
+ 
         N = len(power_passadas[0][0])
         x = np.arange(N)
             
         sensor = self.getFirstSensorIndex()
+        colors = ['olive' if i not in block_change else 'gray' for i in range(N)]
+
         fig, ax1 = plt.subplots(figsize= (self.largura, self.altura), dpi= self.my_dpi)
         ax2 = ax1.twinx()
         fig.subplots_adjust(bottom=0.2)
@@ -633,12 +720,12 @@ class VibCharts:
         title = "Potência por passada, faceamento e desgaste na coleta " + str(self.coleta)
         plt.title( title, fontsize = 15 )
 
-        ax1.bar( x-0.25, power_passadas[sensor-1][0], 0.1, color='olive')
-        ax1.bar( x-0.15, power_passadas[sensor-1][1], 0.1, color='olive')
-        ax1.bar( x-0.05, power_passadas[sensor-1][2], 0.1, color='olive')
-        ax1.bar( x+0.05, power_passadas[sensor-1][3], 0.1, color='olive')
-        ax1.bar( x+0.15, power_passadas[sensor-1][4], 0.1, color='olive')
-        ax1.bar( x+0.25, power_passadas[sensor-1][5], 0.1, color='olive')
+        ax1.bar( x-0.25, power_passadas[sensor-1][0], 0.1, color=colors)
+        ax1.bar( x-0.15, power_passadas[sensor-1][1], 0.1, color=colors)
+        ax1.bar( x-0.05, power_passadas[sensor-1][2], 0.1, color=colors)
+        ax1.bar( x+0.05, power_passadas[sensor-1][3], 0.1, color=colors)
+        ax1.bar( x+0.15, power_passadas[sensor-1][4], 0.1, color=colors)
+        ax1.bar( x+0.25, power_passadas[sensor-1][5], 0.1, color=colors)
         ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
 
         plt.setp(ax1, xticks=x)
@@ -1225,12 +1312,15 @@ if __name__ == '__main__':
 
     #Data
     Sensores = [1,2,3]
+
     v = VibCharts(15, 1, Sensores)
     #v.exportTrainingDataSet()
-    v.plotBars()
+    #v.plotBars()
     #v.plotBarsPassadasRMS()
     #v.plotBarsFaceamentosRMS()
     #v.plotBarsPassadasPower()
+    #v.determineVibRange(1, 2, 2, 2, False)
+
     #for coleta in [15]:
     #    for test in range(1, 35):
     #        if test == 21 or test == 22 or test == 33:
@@ -1257,7 +1347,169 @@ if __name__ == '__main__':
             #    v.plotDFT(sensor, True)
             #    #v.plotDFT(sensor, False)
 
-           
+    
+    #Sensores = [1,2,3]
+    #for coleta in [14]:
+    #    #for test in range(1, 13):
+    #    #    if test == 4:
+    #    #        continue
+    #    #    v = VibCharts(coleta, test, Sensores)
+    #    #    v.exportData(True, True)
+    #    #    v.exportDetailedData()
+    #    #    print("Export Data - Coleta", coleta, "Test", test)
+
+    #    for test in range(1, 13):
+    #        if test == 4:
+    #            continue
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        #v.plotBars()
+    #        #v.buildTable()
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+    #    #        #v.plotVibration(sensor, True)
+    #    #    #    #v.plotVibration(sensor, False)
+    #    #    #    v.plotDFT(sensor, True)
+    #    #    #    #v.plotDFT(sensor, False)
+
+
+    #Sensores = [1,2,3]
+    #for coleta in [13]:
+    #    for test in range(1, 14):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
+    #    for test in range(1, 14):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+
+    #Sensores = [1,2,3]
+    #for coleta in [10]:
+    #    for test in range(1, 22):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
+    #    for test in range(1, 22):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+
+    #Sensores = [1,2,3]
+    #for coleta in [9]:
+    #    for test in range(1, 11):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
+    #    for test in range(1, 11):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+
+    #Sensores = [1,2,3]
+    #for coleta in [8]:
+    #    for test in range(1, 17):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
+    #    for test in range(1, 17):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+
+    #Sensores = [1,2,3]
+    #for coleta in [7]:
+    #    for test in range(1, 8):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
+    #    for test in range(1, 8):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+
+    #Sensores = [1,2,3]
+    #for coleta in [6]:
+    #    for test in range(1, 5):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
+    #    for test in range(1, 5):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+
+    #Sensores = [1,2,3]
+    #for coleta in [5]:
+    #    for test in range(1, 20):
+    #        if test == 2:
+    #            continue
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
+    #    for test in range(1, 20):
+    #        if test == 2:
+    #            continue
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+
+    #Sensores = [1,2]
+    #for coleta in [4]:
+    #    for test in range(1, 7):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.exportData(True, True)
+    #        v.exportDetailedData()
+    #        print("Export Data - Coleta", coleta, "Test", test)
+    #    for test in range(1, 7):
+    #        v = VibCharts(coleta, test, Sensores)
+    #        v.getVibrations()
+    #        v.getParameters(True, True)
+    #        for sensor in Sensores:
+    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+    #            v.plotDFTParts(sensor, True)
+    #            v.plotVibrationParts(sensor, True)
+
+
+
 
     #for coleta in [12]:
     #    Sensores = [1]
