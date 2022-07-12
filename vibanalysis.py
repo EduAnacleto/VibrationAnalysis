@@ -599,6 +599,14 @@ class VibAnalysis:
                 colors = [self.Colors[sensor-1] if i not in block_change else 'gray' for i in range(N)]
 
                 ax1.bar( x, rms_faceamentos[sensor-1], 0.6, color=colors)
+
+                #Tendency line
+                V = [v for v in rms_faceamentos[sensor-1] if v != 0]
+                U = [u for u in x if rms_faceamentos[sensor-1][u] != 0]
+                z = np.polyfit(U, V, 1)
+                p = np.poly1d(z)
+                ax1.plot( x, p(x), "k--")
+
                 ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
 
                 plt.setp(ax1, xticks=x)
@@ -609,7 +617,7 @@ class VibAnalysis:
                 ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
                 ax1.set_ylim( 0, rms_max*1.1)
                 ax2.set_ylim(-0.02, 0.7)
-                ax1.legend( ['Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
+                ax1.legend( ['Linha de tendência', 'Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
                 ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
                 plt.grid( linestyle='--', axis='y' )
                 figpath = self.pathCharts + '/BarFaceamentosC' + str(self.coleta) + 'S' + str(sensor) + self.unit
@@ -1055,7 +1063,7 @@ class VibAnalysis:
             plt.ylabel( self.yLabel[self.unit] )
 
             figpath = ''
-            if invert == True:
+            if invert == False:
                 figpath = self.pathCharts + '/DFT' + str(freq) + 'kT' + str(test1) + 'F' + str(face1) + 'T' + str(test2) + 'F' + str(face2) + 'S' + str(sensor) + Dets
             else:
                 figpath = self.pathCharts + '/DFT' + str(freq) + 'kT' + str(test2) + 'F' + str(face2) + 'T' + str(test1) + 'F' + str(face1) + 'S' + str(sensor) + Dets
@@ -1547,10 +1555,10 @@ if __name__ == '__main__':
 
     v = VibAnalysis(15, 1, Sensores)
     #v.exportTrainingDataSet()
-    #v.plotBars()
-    #v.plotBarsPassadasRMS()
-    #v.plotBarsFaceamentosRMS()
-    #v.plotBarsFaceamentosRMS(True)
+    v.plotBars()
+    v.plotBarsPassadasRMS()
+    v.plotBarsFaceamentosRMS()
+    v.plotBarsFaceamentosRMS(True)
     
     v.getParameters(True, True)
     v.plotFaceamentos(1, 1, 34, 1, True)
