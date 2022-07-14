@@ -545,7 +545,7 @@ class VibAnalysis:
         block_change = []
         bc = 1
         count = 0
-        with open( self.pathData + "/trainingDataSet_a.txt", "r") as text_file:
+        with open(self.pathData + "/trainingDataSet_a.txt", "r") as text_file:
             line = next(text_file)
             for line in text_file:
                 row_text = line.split(";")
@@ -579,7 +579,7 @@ class VibAnalysis:
                 rms = 0
                 rec = 0
                 for p in range(6):
-                    rms += (rms_passadas[sensor-1][p][r]**2) * records_passadas[sensor-1][p][r]
+                    rms += ( rms_passadas[sensor-1][p][r]**2 ) * records_passadas[sensor-1][p][r]
                     rec += records_passadas[sensor-1][p][r]
                 if rec == 0:
                     rms = 0
@@ -709,12 +709,26 @@ class VibAnalysis:
 
             colors = [self.Colors[sensor-1] if i not in block_change else 'gray' for i in range(N)]
 
-            ax1.bar( x-0.25, rms_passadas[sensor-1][0], 0.1, color=colors)
-            ax1.bar( x-0.15, rms_passadas[sensor-1][1], 0.1, color=colors)
-            ax1.bar( x-0.05, rms_passadas[sensor-1][2], 0.1, color=colors)
-            ax1.bar( x+0.05, rms_passadas[sensor-1][3], 0.1, color=colors)
-            ax1.bar( x+0.15, rms_passadas[sensor-1][4], 0.1, color=colors)
-            ax1.bar( x+0.25, rms_passadas[sensor-1][5], 0.1, color=colors)            
+            ax1.bar( x-0.25, rms_passadas[sensor-1][0], 0.1, color=colors )
+            ax1.bar( x-0.15, rms_passadas[sensor-1][1], 0.1, color=colors )
+            ax1.bar( x-0.05, rms_passadas[sensor-1][2], 0.1, color=colors )
+            ax1.bar( x+0.05, rms_passadas[sensor-1][3], 0.1, color=colors )
+            ax1.bar( x+0.15, rms_passadas[sensor-1][4], 0.1, color=colors )
+            ax1.bar( x+0.25, rms_passadas[sensor-1][5], 0.1, color=colors )
+
+
+            V = []
+            for i in range(6):
+                for v in rms_passadas[sensor-1][i]:
+                    if v != 0:
+                        V.append(v)
+
+            U = [u for u in x if rms_passadas[sensor-1][0][u] != 0] * 6
+            z = np.polyfit(U, V, 1)
+            p = np.poly1d(z)
+            ax1.plot(x, p(x), "k--")
+
+
             ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
 
             plt.setp(ax1, xticks=x)
@@ -725,7 +739,7 @@ class VibAnalysis:
             ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
             ax1.set_ylim( 0, rms_max*1.1)
             ax2.set_ylim(-0.02, 0.7)
-            ax1.legend( ['Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
+            ax1.legend( ['Linha de tendência','Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
             ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
             plt.grid( linestyle='--', axis='y' )
             
@@ -788,6 +802,19 @@ class VibAnalysis:
         ax1.bar( x+0.05, power_passadas[sensor-1][3], 0.1, color=colors)
         ax1.bar( x+0.15, power_passadas[sensor-1][4], 0.1, color=colors)
         ax1.bar( x+0.25, power_passadas[sensor-1][5], 0.1, color=colors)
+
+        V = []
+        for i in range(6):
+            for v in power_passadas[sensor-1][i]:
+                if v != 0:
+                    V.append(v)
+
+        U = [u for u in x if power_passadas[sensor-1][0][u] != 0] * 6
+        z = np.polyfit(U, V, 1)
+        p = np.poly1d(z)
+        ax1.plot(x, p(x), "k--")
+
+
         ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
 
         plt.setp(ax1, xticks=x)
@@ -1555,17 +1582,17 @@ if __name__ == '__main__':
 
     v = VibAnalysis(15, 1, Sensores)
     #v.exportTrainingDataSet()
-    v.plotBars()
+    #v.plotBars()
     v.plotBarsPassadasRMS()
-    v.plotBarsFaceamentosRMS()
-    v.plotBarsFaceamentosRMS(True)
+    #v.plotBarsFaceamentosRMS()
+    #v.plotBarsFaceamentosRMS(True)
     
-    v.getParameters(True, True)
-    v.plotFaceamentos(1, 1, 34, 1, True)
-    v.plotFaceamentos(1, 1, 34, 2, True)
+    #v.getParameters(True, True)
+    #v.plotFaceamentos(1, 1, 34, 1, True)
+    #v.plotFaceamentos(1, 1, 34, 2, True)
     
 
-    #v.plotBarsPassadasPower()
+    v.plotBarsPassadasPower()
     #v.determineVibRange(1, 2, 2, 2, False)
 
     #for coleta in [15]:
