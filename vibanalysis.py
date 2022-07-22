@@ -4,8 +4,27 @@ import math
 import os
 from sklearn.cluster import KMeans
 from scipy.fft import fft, fftfreq
+from scipy import signal
 import dwdatareader as dw
 import gc
+from matplotlib import cm
+import matplotlib.colors as colors
+import sys
+
+class MidpointNormalize(colors.Normalize):
+    def __init__(self, vmin=None, vmax=None, vcenter=None, clip=False):
+        self.vcenter = vcenter
+        super().__init__(vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        x, y = [self.vmin, self.vcenter, self.vmax], [0, 0.5, 1.]
+        return np.ma.masked_array(np.interp(value, x, y,
+                                            left=-np.inf, right=np.inf))
+    def inverse(self, value):
+        y, x = [self.vmin, self.vcenter, self.vmax], [0, 0.5, 1]
+        return np.interp(value, x, y, left=-np.inf, right=np.inf)
+
+
 
 class VibAnalysis:
     def __init__(self,
@@ -23,7 +42,7 @@ class VibAnalysis:
         self.coleta = coleta
         self.dxdPart = dxdPart
         self.Sensores = Sensores
-        self.sampleRate = sampleRate / (skip+1)
+        self.sampleRate = sampleRate // (skip+1)
         self.Frequence = Frequence
         self.skip = skip
         self.const_g = 0.109172
@@ -269,28 +288,70 @@ class VibAnalysis:
     
 
     def getVibrations(self, test):
-
         if self.activeVibrations == True:
             self.clearVibrations()
         
         if self.dxdPart == None:
-            # Read data
-            text_file = open(self.pathColeta + "/teste_" + str(test) + ".csv", "r" )
-            #skip the first two lines
-            next( text_file )
-            next( text_file )
-            self.numVibrations = 0;
-            for line in text_file:
-                row_text = line.split(';')
-                for sensor in self.Sensores:
-                    self.Vibrations[sensor-1].append( float(row_text[sensor]))
-                self.numVibrations += 1
 
-            text_file.close()
-            # Duration in seconds
-            self.duration = self.numVibrations / self.sampleRate
-            # time vector
-            self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
+            if type(test) != list:
+
+                # Read data
+                text_file = open(self.pathColeta + "/teste_" + str(test) + ".csv", "r" )
+                #skip the first two lines
+                next( text_file )
+                next( text_file )
+                self.numVibrations = 0;
+                for line in text_file:
+                    row_text = line.split(';')
+                    for sensor in self.Sensores:
+                        self.Vibrations[sensor-1].append( float(row_text[sensor]))
+                    self.numVibrations += 1
+
+                text_file.close()
+                # Duration in seconds
+                self.duration = self.numVibrations / self.sampleRate
+                # time vector
+                self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
+            else:
+                
+                print('Get Vibrations C', self.coleta) 
+                self.duration = 0
+                for part in range(test[0], test[1]+1):
+
+                    file_name = self.pathColeta + "/teste_" + str(part) + ".csv"
+                    if os.path.isfile(file_name) == False:
+                        print('building part', part)
+                        for sensor in self.Sensores:
+                            self.Vibrations[sensor-1] += [0] * (25000000// (self.skip + 1))
+                            # number of vibration records
+                            self.numVibrations += 25000000 // (self.skip + 1)
+                            # Duration in seconds
+                            self.duration += (25000000/(self.skip+1)) / self.sampleRate
+                            # time vector
+                    else:
+                        print('importing part', part)
+                        # Read data                    
+                        text_file = open( file_name, "r" )
+                        # skip the first two lines
+                        next( text_file )
+                        next( text_file )
+                        i = 0;
+                        for line in text_file:
+                            row_text = line.split(';')
+                            i += 1
+                            for sensor in self.Sensores:
+                                if i % (self.skip+1) == 0:
+                                    self.Vibrations[sensor-1].append( float(row_text[sensor]) )
+
+                        text_file.close()
+                        # number of vibration records
+                        self.numVibrations += i // (self.skip + 1)
+                        # Duration in seconds
+                        self.duration += (i/(self.skip+1)) / self.sampleRate
+                        # time vector
+
+                self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
+
 
         else:
 
@@ -917,7 +978,6 @@ class VibAnalysis:
                    
     
     def plotVibrationParts( self, sensor, details = False ):
-
         self.create_directory("ChartsParts")
 
         # Constructing
@@ -940,7 +1000,7 @@ class VibAnalysis:
                     plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
                 else:
                     plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
-
+            
 
             if self.unit == 'a':
                 plt.plot( self.Time[start:end], self.Vibrations[sensor-1][start:end], self.Colors[sensor-1] )
@@ -1159,7 +1219,11 @@ class VibAnalysis:
         plt.rc('font', **{'size' : 18})
         plt.ticklabel_format(style = 'plain')
         plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
-        title = "Gráfico no domínio do tempo do teste " + str(self.test) + " da coleta " + str(self.coleta)
+        title = ''
+        if type(self.test) != list:
+            title = "Gráfico no domínio do tempo do teste " + str(self.test) + " da coleta " + str(self.coleta)
+        else:
+            title = "Gráfico no domínio do tempo dos testes de " + str(self.test[0]) + " até " + str(self.test[1]) + " da coleta " + str(self.coleta)
 
         if self.dxdPart == None:
             plt.title( title )
@@ -1169,7 +1233,7 @@ class VibAnalysis:
                 plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
             else:
                 plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
-
+        
 
         if self.unit == 'a':
             plt.plot( self.Time, self.Vibrations[sensor-1], self.Colors[sensor-1] )
@@ -1179,7 +1243,7 @@ class VibAnalysis:
         Dets = ''
         if details == True:
             plt.ylim( self.vib_lower[sensor-1], self.vib_upper[sensor-1] )
-            plt.axhline(y=self.vib_rms[sensor-1], color='m', linestyle='--')
+            plt.axhline( y=self.vib_rms[sensor-1], color='m', linestyle='--' )
             Dets = 'D'
 
         plt.ylabel( self.yLabel[self.unit] )
@@ -1187,7 +1251,7 @@ class VibAnalysis:
         if details == True:
             plt.legend( self.Legend[sensor-1] + ['RMS'] )
         else:
-            plt.legend( self.Legend[sensor-1] )
+            plt.legend( self.Legend[sensor-1], loc='upper left' )
 
         plt.xlabel( "Tempo (s)" )
         plt.grid( linestyle='--', axis='y' )
@@ -1197,10 +1261,68 @@ class VibAnalysis:
             plt.savefig( figpath + self.unit + '.png' )
         else:
             plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
-
         plt.close()
         plt.cla()
         plt.clf()
+
+
+
+    def plotEspectro2d( self, sensor ):
+        self.create_directory("Charts")
+        f, t, Sxx = signal.spectrogram( np.array(self.Vibrations[sensor-1]), self.sampleRate, nperseg=int(self.sampleRate), mode='magnitude')
+        #t *= (self.duration /np.max(t))
+        
+
+        for freq in self.Frequence:
+            myfilter = (f<=freq*1000)
+            f_i = f[myfilter]/1000
+            Sxx_i = Sxx[myfilter, ...]
+
+            #plt.rc('font', **{'size' : 18})
+            plt.ticklabel_format(style = 'plain')
+            plt.figure( figsize=(self.largura, self.altura), dpi= self.my_dpi )
+            if type(self.test) != list:
+                plt.title("Gráfico no dimínio da frequência e do tempo no teste " + str(self.test) + " da coleta " + str(self.coleta)) + " do sensor " + str(sensor)
+            else:
+                plt.title("Gráfico no domínio da frequência e do tempo nos testes de " + str(self.test[0]) + " até " + str(self.test[1]) + " da coleta " + str(self.coleta) + " do sensor " + str(sensor))
+                
+
+            #if sensor == 3:
+            #    plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, shading='gouraud', cmap=cm.Greens)
+            #elif sensor == 2:
+            #    plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, shading='gouraud', cmap=cm.Reds)
+            #else:
+                #plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, shading='gouraud', cmap=cm.Blues)
+                #plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, shading='gouraud', cmap='tab20')
+                #https://matplotlib.org/stable/tutorials/colors/colormapnorms.html
+                #(Terrain color map)
+            colors_undersea = plt.cm.terrain( np.linspace(0, 0.17, 256) )
+            colors_land = plt.cm.terrain( np.linspace(0.25, 1, 256) )
+            all_colors = np.vstack((colors_undersea, colors_land))
+            terrain_map = colors.LinearSegmentedColormap.from_list('terrain_map', all_colors)
+
+            divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.025, vmax=0.5)
+            plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, norm=divnorm, cmap=terrain_map, shading='auto')
+
+            cbar = plt.colorbar()
+            cbar.set_label('Aceleração (m/s^2)')
+
+            #plt.legend(Legend[sensor-1])
+            #plt.ylabel( ylabel )
+            plt.xlabel( "Tempo (s)" )
+            plt.ylabel( "Frequência (kHz)" )
+            #plt.xlabel( xlabel )
+            #plt.grid()
+
+            figpath = self.pathCharts + '/Esp2DT' + str(self.test) + 'S' + str(sensor)
+            if self.dxdPart == None:
+                plt.savefig( figpath + self.unit + '.png' )
+            else:
+                plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
+            plt.close()
+            plt.cla()
+            plt.clf()
+
 
 
     def plotDFTParts(self, sensor, details = False):
@@ -1583,14 +1705,17 @@ class VibAnalysis:
 
 if __name__ == '__main__':
 
-    #Data
-    Sensores = [1,2,3]
+    sensor = int(sys.argv[1])
+    chartBool = int(sys.argv[2])
 
-    v = VibAnalysis(15, 1, Sensores)
+    #Data
+    #Sensores = [1,2,3]
+
+    #v = VibAnalysis(15, 1, Sensores)
     #v.exportTrainingDataSet()
     #v.plotBars()
-    v.plotBarsPassadasRMS()
-    v.plotBarsFaceamentosRMS()
+    #v.plotBarsPassadasRMS()
+    #v.plotBarsFaceamentosRMS()
     #v.plotBarsFaceamentosRMS(True)
     
     #v.getParameters(True, True)
@@ -1598,10 +1723,19 @@ if __name__ == '__main__':
     #v.plotFaceamentos(1, 1, 34, 2, True)
     
 
-    v.plotBarsPassadasPower()
+    #v.plotBarsPassadasPower()
     #v.determineVibRange(1, 2, 2, 2, False)
 
-    #for coleta in [15]:
+    for coleta in [15]:
+        if chartBool == 0:
+            v = VibAnalysis( coleta=coleta, test=[1,34], Sensores=[sensor], skip=10, Frequence=[3] )
+            v.getVibrations([1,34])
+            v.plotVibration(sensor)
+        else:
+            v = VibAnalysis( coleta=coleta, test=[1,34], Sensores=[sensor], skip=20, Frequence=[3] )
+            v.getVibrations([1,34])
+            v.plotEspectro2d(sensor)
+
         #for test in range(1, 35):
         #    if test == 21 or test == 22 or test == 33:
         #        continue
