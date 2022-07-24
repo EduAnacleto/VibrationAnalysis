@@ -1,17 +1,24 @@
+# Get Vibrations
+# Quatro possibilidades estão sendo consideradas
+#
+# 1) Importação de um teste isolado
+# 2) Importação de uma sequência de testes
+# 3) Importação da parte de um teste
+# 4) Importação de uma sequência de partes de um teste
+
 def get_vibrations(self, test):
     if self.activeVibrations == True:
         self.clearVibrations()
     
     if self.dxdPart == None:
+        #Importação de um teste isolado ou sequência de testes
 
         if type(test) != list:
-            # Read data
+            # teste isolado
+
+            # read data
             file_name = self.pathColeta + "/teste_" + str(test) + ".csv"
             if os.path.isfile(file_name) == True:
-
-                #Time vector
-                self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
-
                 text_file = open(self.pathColeta + "/teste_" + str(test) + ".csv", "r" )
 
                 #skip the first two lines
@@ -21,10 +28,10 @@ def get_vibrations(self, test):
                 for line in text_file:
                     row_text = line.split(';')
                     for sensor in self.Sensores:
-                        self.Vibrations[sensor-1].append( float(row_text[sensor]))
+                        self.Vibrations[sensor-1].append( float(row_text[sensor]) )
                     self.numVibrations += 1
-
                 text_file.close()
+
                 # Duration in seconds
                 self.duration = self.numVibrations / self.sampleRate
                 # time vector
@@ -33,8 +40,9 @@ def get_vibrations(self, test):
                 return False
 
         else:
+            #Importa de parte de um teste ou uma sequência de partes
             
-            print('Get Vibrations C', self.coleta) 
+            print('Get Vibrations C', self.coleta)
             self.duration = 0
             for part in range(test[0], test[1]+1):
 
@@ -42,11 +50,11 @@ def get_vibrations(self, test):
                 if os.path.isfile(file_name) == False:
                     print('building part', part)
                     for sensor in self.Sensores:
-                        self.Vibrations[sensor-1] += [0] * (13000000// (self.skip + 1))
+                        self.Vibrations[sensor-1] += [0] * (26000000// (self.skip + 1))
                         # number of vibration records
-                        self.numVibrations += 13000000 // (self.skip + 1)
+                        self.numVibrations += 26000000 // (self.skip + 1)
                         # Duration in seconds
-                        self.duration += (13000000/(self.skip+1)) / self.sampleRate
+                        self.duration += (26000000/(self.skip+1)) / self.sampleRate
                         # time vector
                 else:
                     print('importing part', part)
