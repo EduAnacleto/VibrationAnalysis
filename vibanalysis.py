@@ -11,6 +11,14 @@ from matplotlib import cm
 import matplotlib.colors as colors
 import sys
 
+
+
+# functions
+import get_vibrations
+import io_data
+
+
+
 class MidpointNormalize(colors.Normalize):
     def __init__(self, vmin=None, vmax=None, vcenter=None, clip=False):
         self.vcenter = vcenter
@@ -27,6 +35,8 @@ class MidpointNormalize(colors.Normalize):
 
 
 class VibAnalysis:
+
+
     def __init__(self,
             coleta = 14,
             test = 5,
@@ -116,6 +126,20 @@ class VibAnalysis:
         self.dft_lower.clear()
         self.dft_upper.clear()
         self.dft_max.clear()
+
+    
+    #Get Vibrations
+    getVibrations = get_vibrations 
+
+    #Input Output Data
+    exportVibParts = export_vib_parts
+    importVibParts = import_vib_parts
+    importLUData = import_lu_data
+    importPassadaData = import_passada_data
+    exportTrainingDataSet = export_training_dataset
+    exportData = export_data
+    exportDetailedData = export_detailed_data
+
 
 
     def clearVibrations( self ):
@@ -287,193 +311,6 @@ class VibAnalysis:
 
     
 
-    def getVibrations(self, test):
-        if self.activeVibrations == True:
-            self.clearVibrations()
-        
-        if self.dxdPart == None:
-
-            if type(test) != list:
-
-                # Read data
-                text_file = open(self.pathColeta + "/teste_" + str(test) + ".csv", "r" )
-                #skip the first two lines
-                next( text_file )
-                next( text_file )
-                self.numVibrations = 0;
-                for line in text_file:
-                    row_text = line.split(';')
-                    for sensor in self.Sensores:
-                        self.Vibrations[sensor-1].append( float(row_text[sensor]))
-                    self.numVibrations += 1
-
-                text_file.close()
-                # Duration in seconds
-                self.duration = self.numVibrations / self.sampleRate
-                # time vector
-                self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
-            else:
-                
-                print('Get Vibrations C', self.coleta) 
-                self.duration = 0
-                for part in range(test[0], test[1]+1):
-
-                    file_name = self.pathColeta + "/teste_" + str(part) + ".csv"
-                    if os.path.isfile(file_name) == False:
-                        print('building part', part)
-                        for sensor in self.Sensores:
-                            self.Vibrations[sensor-1] += [0] * (25000000// (self.skip + 1))
-                            # number of vibration records
-                            self.numVibrations += 25000000 // (self.skip + 1)
-                            # Duration in seconds
-                            self.duration += (25000000/(self.skip+1)) / self.sampleRate
-                            # time vector
-                    else:
-                        print('importing part', part)
-                        # Read data                    
-                        text_file = open( file_name, "r" )
-                        # skip the first two lines
-                        next( text_file )
-                        next( text_file )
-                        i = 0;
-                        for line in text_file:
-                            row_text = line.split(';')
-                            i += 1
-                            for sensor in self.Sensores:
-                                if i % (self.skip+1) == 0:
-                                    self.Vibrations[sensor-1].append( float(row_text[sensor]) )
-
-                        text_file.close()
-                        # number of vibration records
-                        self.numVibrations += i // (self.skip + 1)
-                        # Duration in seconds
-                        self.duration += (i/(self.skip+1)) / self.sampleRate
-                        # time vector
-
-                self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
-
-
-        else:
-
-            for part in range(self.dxdPart[0], self.dxdPart[1]+1):
-                file_name = self.path + str(self.coleta) + "/Dados/faceamento " + str(test) + "_{:04d}.dxd".format(part)
-
-                print( file_name )
-                with dw.open( file_name ) as f:
-                    canais = []
-                    canal = [[],[],[]]
-                    for ch in f.values():
-                        canais.append( ch.name )
-                    
-                    for sensor in self.Sensores:
-                        canal[sensor-1] = f[canais[sensor-1]].series()
-                        
-                        vibrations = list(canal[sensor-1].values)
-                        times = list(canal[0].index)
-                        for i in range(len(vibrations)):
-                            if i % (self.skip+1) == 0:
-                                self.Vibrations[sensor-1].append( vibrations[i] )
-                                self.Time.append( times[i] )
-
-            # number of vibrations
-            self.numVibrations = len(self.Vibrations[0])
-            # Duration in seconds 
-            self.duration = self.numVibrations / self.sampleRate
-            #print(self.Vibrations[0][:100])
-            
-        self.activeVibrations = True
-        return True
-
-
-
-
-    def exportData( self, test, setLU = True, setParts = False ):
-
-        self.create_directory("Data")
-        self.getVibrations(test)
-
-        for sensor in self.Sensores:
-
-            if setLU == True:
-                self.vib_rms[sensor-1] = self.get_rms(self.Vibrations[sensor-1])
-
-                self.vib_min[sensor-1], \
-                self.vib_lower[sensor-1], \
-                self.vib_upper[sensor-1], \
-                self.vib_max[sensor-1] = self.dispersion_measures(self.Vibrations[sensor-1])
-                
-                self.dft_min[sensor-1], \
-                self.dft_lower[sensor-1], \
-                self.dft_upper[sensor-1], \
-                self.dft_max[sensor-1] = self.dft_dispersion_measures(self.Vibrations[sensor-1])
-
-            if setParts == True:
-                self.vibrationParts(sensor)
-                self.vib_rms_movi[sensor-1], self.vib_rms_pass[sensor-1] = self.get_rmsParts(sensor, self.Vibrations[sensor-1])
-
-            with open(self.pathData + "/data_" + str(self.unit) + ".txt", "a") as f:
-                f.write("{:2d};".format(self.coleta) +
-                    " {:2d};".format(self.test) +
-                    " {:1d};".format(sensor) +
-                    " {:10d};".format(self.numVibrations) +
-                    " {:10.5f};".format(self.duration) +
-                    " {:10.5f};".format(self.vib_rms[sensor-1]) +
-                    " {:4d};".format(self.numPassadas[sensor-1]) +
-                    " {:10.5f};".format(self.durationPassadas[sensor-1]) +
-                    " {:10.5f};".format(self.vib_rms_pass[sensor-1]) +
-                    " {:4d};".format(self.numParts[sensor-1] - self.numPassadas[sensor-1]) +
-                    " {:10.5f};".format(self.duration - self.durationPassadas[sensor-1]) +
-                    " {:10.5f};".format(self.vib_rms_movi[sensor-1]) +
-                    " {:10.5f};".format(self.vib_min[sensor-1]) +
-                    " {:10.5f};".format(self.vib_lower[sensor-1]) +
-                    " {:10.5f};".format(self.vib_upper[sensor-1]) +
-                    " {:10.5f};".format(self.vib_max[sensor-1]) +
-                    " {:10.5f};".format(self.dft_upper[sensor-1]) +
-                    " {:10.5f};".format(self.dft_max[sensor-1]) +
-                    "\n")
-
-    def exportDetailedData( self ):
-
-        self.create_directory("Data")
-        self.getVibrations()
-
-        for sensor in self.Sensores:
-            self.vibrationParts(sensor)
-            for i in range(self.numParts[sensor-1]):
-                type_moviment = self.parts[sensor-1][i][0]
-                start = self.parts[sensor-1][i][1]
-                end = self.parts[sensor-1][i][2]
-
-                numVibrations = end - start
-                duration = numVibrations / self.sampleRate
-
-                vib_rms = self.get_rms(self.Vibrations[sensor-1][start:end])
-
-                vib_min, \
-                vib_lower, \
-                vib_upper, \
-                vib_max = self.dispersion_measures(self.Vibrations[sensor-1][start:end])
-                
-                dft_min, \
-                dft_lower, \
-                dft_upper, \
-                dft_max = self.dft_dispersion_measures(self.Vibrations[sensor-1][start:end])
-
-                with open(self.pathData + "/detaileddata_" + str(self.unit) + ".txt", "a") as f:
-                    f.write("{:2d};".format(self.coleta) +
-                        " {:2d};".format(self.test) +
-                        " {:1d};".format(sensor) +
-                        " {:1d};".format(type_moviment) +
-                        " {:10d};".format(numVibrations) +
-                        " {:10.5f};".format(duration) +
-                        " {:10.5f};".format(vib_rms) +
-                        " {:10.5f};".format(vib_min) +
-                        " {:10.5f};".format(vib_lower) +
-                        " {:10.5f};".format(vib_upper) +
-                        " {:10.5f};".format(vib_max) +
-                        " {:10.5f};".format(dft_upper) +
-                        " {:10.5f};".format(dft_max) +
-                        "\n")
 
 
     
@@ -555,19 +392,21 @@ class VibAnalysis:
         text_file = open(self.pathData + "/data_" + self.unit + ".txt", "r")
         for line in text_file:
             row_text = line.split(";")
-            #label.append(row_text[1])
+            label.append(row_text[1])
             sensor = int(row_text[2])
             rms[sensor-1].append(float(row_text[5]))
 
-        N = len(rms[0])
+        N = len( rms[self.Sensores[0]-1] )
         label = list(set(label))
         label.sort()
 
         plt.figure( figsize = (self.largura, self.altura), dpi= self.my_dpi )
         title = "RMS na coleta " + str(self.coleta)
-        plt.title( title, fontsize = 15)
+        plt.title( title, fontsize = 15 )
 
         x = np.arange(N)
+
+        #label = x+1
 
         legend = []
         for sensor in self.Sensores:
@@ -582,9 +421,9 @@ class VibAnalysis:
             if sensor == 3:
                 plt.bar(x + 0.2, rms[sensor-1], 0.2, color=self.Colors[sensor-1])
         
-        plt.xticks(x, label )
+        plt.xticks( x, label )
         plt.xlabel("testes", fontsize=15, labelpad=10 )
-        plt.ylabel(self.yLabel[self.unit], fontsize=15, labelpad=10 )
+        plt.ylabel( self.yLabel[self.unit], fontsize=15, labelpad=10 )
         plt.legend( legend )
         plt.grid( linestyle='--', axis='y' )
         figpath = self.pathCharts + '/BarC' + str(self.coleta) + self.unit
@@ -594,16 +433,16 @@ class VibAnalysis:
         plt.clf()
 
 
-    def plotBarsFaceamentosRMS( self, join = False):
+    def plotBarsFaceamentosRMS( self, nPassadas = 6, join = False):
         rms_passadas = [
-            [[],[],[],[],[],[]],
-            [[],[],[],[],[],[]],
-            [[],[],[],[],[],[]]
+            [[],[],[],[],[],[],[]],
+            [[],[],[],[],[],[],[]],
+            [[],[],[],[],[],[],[]]
             ]
         records_passadas = [
-            [[],[],[],[],[],[]],
-            [[],[],[],[],[],[]],
-            [[],[],[],[],[],[]]
+            [[],[],[],[],[],[],[]],
+            [[],[],[],[],[],[],[]],
+            [[],[],[],[],[],[],[]]
             ]
         
         rms_max = 0
@@ -634,24 +473,25 @@ class VibAnalysis:
                             block_change.append(count)
                         count += 1
 
-        N = len(rms_passadas[0][0])
+        N = len(rms_passadas[self.Sensores[0]-1][0])
         x = np.arange(N)
 
 
         # construct rms faceamentos
         rms_faceamentos = [[],[],[]]
-        for sensor in self.Sensores:        
+        for sensor in self.Sensores:
             for r in range(N):
                 rms = 0
                 rec = 0
-                for p in range(6):
+                for p in range(nPassadas):
                     rms += ( rms_passadas[sensor-1][p][r]**2 ) * records_passadas[sensor-1][p][r]
                     rec += records_passadas[sensor-1][p][r]
                 if rec == 0:
                     rms = 0
                 else:
-                    rms = np.sqrt(rms/rec)
+                    rms = np.sqrt( rms/rec )
                 rms_faceamentos[sensor-1].append(rms)
+
                 
         if join == False:
             for sensor in self.Sensores:
@@ -663,17 +503,21 @@ class VibAnalysis:
                 plt.title( title, fontsize = 15 )
 
                 colors = [self.Colors[sensor-1] if i not in block_change else 'gray' for i in range(N)]
-
-                ax1.bar( x, rms_faceamentos[sensor-1], 0.6, color=colors)
+                
+                ax1.bar( x, rms_faceamentos[sensor-1], 0.6, color=colors )
 
                 #Tendency line
-                V = [v for v in rms_faceamentos[sensor-1] if v != 0]
-                U = [u for u in x if rms_faceamentos[sensor-1][u] != 0]
-                z = np.polyfit(U, V, 1)
-                p = np.poly1d(z)
-                ax1.plot( x, p(x), "k--")
+                V = [ v for v in rms_faceamentos[sensor-1] if v != 0 ]
+                U = [ u for u in x if rms_faceamentos[sensor-1][u] != 0 ]
+                z = np.polyfit( U, V, 1 )
+                p = np.poly1d( z )
+                ax1.plot( x, p(x), "k--" )
 
-                ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
+                
+                # Ajustar importação do desgaste
+                #ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
+                ax2.plot([-1, 25, 26, 27, 28, 29, 30], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
+                ax2.plot( [30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42,   43], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
 
                 plt.setp(ax1, xticks=x)
                 plt.setp(ax2, xticks=x)
@@ -684,7 +528,7 @@ class VibAnalysis:
                 ax1.set_ylim( 0, rms_max*1.1)
                 ax2.set_ylim(-0.02, 0.7)
                 ax1.legend( ['Linha de tendência ' + str(p), 'Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
-                ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
+                ax2.legend( ['Desgaste aresta 1', 'Desgaste aresta 2'], loc='upper right', fontsize = 15 )
                 plt.grid( linestyle='--', axis='y' )
                 figpath = self.pathCharts + '/BarFaceamentosC' + str(self.coleta) + 'S' + str(sensor) + self.unit
                 plt.savefig( figpath + '.png' )
@@ -693,23 +537,28 @@ class VibAnalysis:
                 plt.clf()
 
         else:
+
             fig, ax1 = plt.subplots(figsize= (self.largura, self.altura), dpi= self.my_dpi)
             ax2 = ax1.twinx()
             fig.subplots_adjust(bottom=0.2)
 
             title = "RMS por faceamento e desgaste na coleta " + str(self.coleta)
             plt.title( title, fontsize = 15 )
+            colors = [[self.Colors[sensor] if i not in block_change else 'gray' for i in range(N)] for sensor in range(3)]
+            
+            position = [[], [0,0,0], [0,-0.1, 0.1], [-0.2, 0, +0.2]]
+            num_pos = len(self.Sensores)
+            for s in self.Sensores:
+                ax1.bar(x + position[num_pos][s-1], rms_faceamentos[s-1], 0.2, color=colors[s-1])
 
-            colors = [[self.Colors[sensor-1] if i not in block_change else 'gray' for i in range(N)] for sensor in self.Sensores]
+            # Ajustar importação do desgaste
+           # ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
+            ax2.plot( [-1, 25, 26, 27, 28, 29, 30], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
+            ax2.plot( [30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42,   43], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
 
-            ax1.bar( x-0.2, rms_faceamentos[0], 0.2, color=colors[0])
-            ax1.bar( x, rms_faceamentos[1], 0.2, color=colors[1])
-            ax1.bar( x+0.2, rms_faceamentos[2], 0.2, color=colors[2])
-            ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
-
-            plt.setp(ax1, xticks=x)
-            plt.setp(ax2, xticks=x)
-            ax1.set_xticklabels(label[self.Sensores[0]], rotation=90, fontsize=12)
+            plt.setp( ax1, xticks=x )
+            plt.setp( ax2, xticks=x )
+            ax1.set_xticklabels( label[self.Sensores[0]-1], rotation=90, fontsize=12 )
             ax1.set_xlabel("teste - faceamento", fontsize=15, labelpad=10 )
             ax1.set_ylabel( self.yLabel[self.unit], fontsize=15, labelpad=10 )
             ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
@@ -717,7 +566,7 @@ class VibAnalysis:
             ax2.set_ylim(-0.02, 0.7)
             
             ax1.legend( ['Sensor ' + str(sensor) for sensor in self.Sensores], loc='upper left', fontsize = 15 )
-            ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
+            ax2.legend( ['Desgaste aresta 1', 'Desgaste aresta 2'], loc='upper right', fontsize = 15 )
             plt.grid( linestyle='--', axis='y' )
             figpath = self.pathCharts + '/BarFaceamentosC' + str(self.coleta) + 'S123' + self.unit
             plt.savefig( figpath + '.png' )
@@ -728,11 +577,12 @@ class VibAnalysis:
 
 
 
-    def plotBarsPassadasRMS( self ):
+    def plotBarsPassadasRMS( self, nPassadas = 6 ):
+
         rms_passadas = [
-            [[],[],[],[],[],[]],
-            [[],[],[],[],[],[]],
-            [[],[],[],[],[],[]]
+            [[],[],[],[],[],[],[]],
+            [[],[],[],[],[],[],[]],
+            [[],[],[],[],[],[],[]]
             ]
         
         rms_max = 0
@@ -761,14 +611,15 @@ class VibAnalysis:
                             block_change.append(count)
                         count += 1
             
-        N = len(rms_passadas[0][0])
+        N = len(rms_passadas[self.Sensores[0]-1][0])
         x = np.arange(N)
+
 
 
         for sensor in self.Sensores:
             fig, ax1 = plt.subplots(figsize= (self.largura, self.altura), dpi= self.my_dpi)
             ax2 = ax1.twinx()
-            fig.subplots_adjust(bottom=0.2)
+            fig.subplots_adjust( bottom=0.2 )
 
             title = "RMS por passada, faceamento e desgaste na Coleta " + str(self.coleta)
             plt.title( title, fontsize = 15 )
@@ -784,27 +635,31 @@ class VibAnalysis:
 
 
             V = []
-            for i in range(6):
+            for i in range(nPassadas):
                 for v in rms_passadas[sensor-1][i]:
                     if v != 0:
                         V.append(v)
 
-            U = [u for u in x if rms_passadas[sensor-1][0][u] != 0] * 6
+            U = [ u for u in x if rms_passadas[sensor-1][0][u] != 0 ] * nPassadas
             z = np.polyfit(U, V, 1)
             p = np.poly1d(z)
             ax1.plot(x, p(x), "k--")
 
 
-            ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
+            # Ajustar importação do desgaste
+            #ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
+            ax2.plot([-1, 25, 26, 27, 28, 29, 30], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
+            ax2.plot( [30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42,   43], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
 
-            plt.setp(ax1, xticks=x)
-            plt.setp(ax2, xticks=x)
-            ax1.set_xticklabels(label[sensor-1], rotation=90, fontsize=12)
-            ax1.set_xlabel("teste - faceamento", fontsize=15, labelpad=10 )
+
+            plt.setp( ax1, xticks=x )
+            plt.setp( ax2, xticks=x )
+            ax1.set_xticklabels( label[sensor-1], rotation=90, fontsize=12 )
+            ax1.set_xlabel( "teste - faceamento", fontsize=15, labelpad=10 )
             ax1.set_ylabel( self.yLabel[self.unit], fontsize=15, labelpad=10 )
             ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
-            ax1.set_ylim( 0, rms_max*1.1)
-            ax2.set_ylim(-0.02, 0.7)
+            ax1.set_ylim( 0, rms_max*1.1 )
+            ax2.set_ylim( -0.02, 0.7 )
             ax1.legend( ['Linha de tendência ' + str(p),'Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
             ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
             plt.grid( linestyle='--', axis='y' )
@@ -816,11 +671,11 @@ class VibAnalysis:
             plt.clf()
 
       
-    def plotBarsPassadasPower( self ):
+    def plotBarsPassadasPower( self, nPassadas = 6 ):
         power_passadas = [
-            [[],[],[],[],[],[]],
-            [[],[],[],[],[],[]],
-            [[],[],[],[],[],[]]
+            [[],[],[],[],[],[],[]],
+            [[],[],[],[],[],[],[]],
+            [[],[],[],[],[],[],[]]
             ]
         
         power_max = 0
@@ -870,12 +725,12 @@ class VibAnalysis:
         ax1.bar( x+0.25, power_passadas[sensor-1][5], 0.1, color=colors)
 
         V = []
-        for i in range(6):
+        for i in range(nPassadas):
             for v in power_passadas[sensor-1][i]:
                 if v != 0:
                     V.append(v)
 
-        U = [u for u in x if power_passadas[sensor-1][0][u] != 0] * 6
+        U = [u for u in x if power_passadas[sensor-1][0][u] != 0] * nPassadas
         z = np.polyfit(U, V, 1)
         p = np.poly1d(z)
         ax1.plot(x, p(x), "k--")
@@ -1240,6 +1095,7 @@ class VibAnalysis:
         elif self.unit == 'g':
             plt.plot( self.Time, convert_to_g(self.Vibrations[sensor-1]), self.Colors[sensor-1] )
 
+        plt.ylim( -125, 125 )
         Dets = ''
         if details == True:
             plt.ylim( self.vib_lower[sensor-1], self.vib_upper[sensor-1] )
@@ -1301,7 +1157,8 @@ class VibAnalysis:
             all_colors = np.vstack((colors_undersea, colors_land))
             terrain_map = colors.LinearSegmentedColormap.from_list('terrain_map', all_colors)
 
-            divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.025, vmax=0.5)
+            #divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.025, vmax=0.5)
+            divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.05, vmax=1)
             plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, norm=divnorm, cmap=terrain_map, shading='auto')
 
             cbar = plt.colorbar()
@@ -1518,223 +1375,87 @@ class VibAnalysis:
                 self.exportVibParts(sensor)
 
 
-    def exportVibParts(self, sensor):
-        self.create_directory("Data")
-        if self.numParts[sensor-1] == 0:
-            return False
-        
-        with open(self.pathData + "/VibPartsT" + str(self.test) + "S" + str(sensor) + ".txt", "w") as f:
-            f.write(str(self.numParts[sensor-1]) + ";\n")
-            for i in range(self.numParts[sensor-1]):
-                f.write(str(self.parts[sensor-1][i][0]) + "; " + str(self.parts[sensor-1][i][1]) + "; " + str(self.parts[sensor-1][i][2]) + ";\n")
-        return True
-
-
-    def importVibParts(self, sensor):
-
-        if self.numParts[sensor-1] == 0:
-            text_file = open(self.pathData + "/VibPartsT" + str(self.test) + "S" + str(sensor) + ".txt", "r")
-            line = next (text_file)
-            row_text = line.split(";")
-            self.numParts[sensor-1] = int(row_text[0])
-            self.numPassadas[sensor-1] = 0
-            for line in text_file:
-                row_text = line.split(";")
-                self.parts[sensor-1].append([int(row_text[0]), int(row_text[1]), int(row_text[2])])
-                self.numPassadas[sensor-1] += int(row_text[0])
-
     
-    def importLUData(self):
-        lower_vib = [[],[],[]]
-        upper_vib = [[],[],[]]
-        upper_dft = [[],[],[]]
-        text_file = open(self.pathData + "/data_" + self.unit + ".txt", "r")
-        iteration = 0
-        for line in text_file:
-            row_text = line.split(";")
-            sensor = int(row_text[2])
-
-            if self.test == int(row_text[1]) and iteration == self.dxdPart[0]:
-                self.vib_rms[sensor-1] = float(row_text[5])
-            lower_vib[sensor-1].append(float(row_text[13]))
-            upper_vib[sensor-1].append(float(row_text[14]))
-            upper_dft[sensor-1].append(float(row_text[16]))
-        text_file.close()
-        for sensor in self.Sensores:
-            self.vib_lower[sensor-1], blank = self.extValues_normalityBand(lower_vib[sensor-1])
-            blank, self.vib_upper[sensor-1] = self.extValues_normalityBand(upper_vib[sensor-1])
-            blank, self.dft_upper[sensor-1] = self.extValues_normalityBand(upper_dft[sensor-1])
-    
-
-    def importPassadaData(self, teste, sensor, faceamento, passada, passada_por_faceamento): 
-        id_passada = passada + (faceamento-1)*passada_por_faceamento
-
-        numVibrations = 0
-        duration = 0
-        rms = 0
-        vib_min = 0
-        vib_max = 0
-        dft_max = 0
-        with open(self.pathData + "/detaileddata_" + self.unit + ".txt", "r") as text_file:
-            num_passada = 0
-            for line in text_file:
-                row_text = line.split(';')
-                
-                if teste != int(row_text[1]):
-                    continue
-                if sensor != int(row_text[2]):
-                    continue
-                if int(row_text[3]) != 1:
-                    continue
-
-                num_passada += 1
-                if id_passada != num_passada:
-                    continue
-
-                numVibrations = int(row_text[4])
-                duration = float(row_text[5])
-                rms = float(row_text[6])
-                vib_min = float(row_text[7])
-                vib_max = float(row_text[10])
-                dft_max = float(row_text[12])
-                break
-
-        return numVibrations, duration, rms, vib_min, vib_max, dft_max
-
-    
-    def exportTrainingDataSet(self):
-        # This functions may be used to merge the files 'detaliedData' and 'PotenciaPorPassada'
-        
-        arq1_title = ''
-        arq1_blocoOrigem = []
-        arq1_bloco = []
-        arq1_teste = []
-        arq1_faceamento = []
-        arq1_passada = []
-        arq1_potenciaMediaObservada = []
-        arq1_desgasteAntes = []
-        arq1_desgasteDepois = []
-        with open(self.pathData + "/PotenciaDesgastePorPassada.txt", "r") as text_file:
-            line = next(text_file)
-            arq1_title = line.split(";")
-            for line in text_file:
-                row_text = line.split(';')
-                arq1_blocoOrigem.append(str(row_text[0]))
-                arq1_bloco.append(int(row_text[1]))
-                arq1_teste.append(int(row_text[2]))
-                arq1_faceamento.append(int(row_text[3]))
-                arq1_passada.append(int(row_text[4]))
-                arq1_potenciaMediaObservada.append(int(row_text[5]))
-                arq1_desgasteAntes.append(row_text[6].strip())
-                arq1_desgasteDepois.append(row_text[7].strip())
-
-        N1 = len(arq1_teste)
-        
-        
-        arq2_teste = []
-        arq2_sensor = []
-        arq2_tipo_movimento = []
-        arq2_numVibrations = []
-        arq2_duration = []
-        arq2_rms = []
-        arq2_vib_min = []
-        arq2_vib_max = []
-        with open(self.pathData + "/detaileddata_" + self.unit + ".txt", "r") as text_file:
-            for line in text_file:
-                row_text = line.split(';')
-                arq2_teste.append(int(row_text[1]))
-                arq2_sensor.append(int(row_text[2]))
-                arq2_tipo_movimento.append(int(row_text[3]))
-                arq2_numVibrations.append(int(row_text[4]))
-                arq2_duration.append(float(row_text[5]))
-                arq2_rms.append(float(row_text[6]))
-                arq2_vib_min.append(float(row_text[7]))
-                arq2_vib_max.append(float(row_text[10]))
-        N2 = len(arq2_teste)
-        
-
-        with open(self.pathData + "/trainingDataSet_" + self.unit + ".txt", "w") as f:
-            
-            f.write("coleta; "+
-                    "blocoOrigem; " +
-                    "bloco; " +
-                    "teste; " +
-                    "sensor; " +
-                    "faceamento; " +
-                    "passada; " +
-                    "numVibrations; " +
-                    "duration; " +
-                    "RMS; " +
-                    "vibMax; " +
-                    "vibMin; " +
-                    "dftMax; " +
-                    "potencia; " +
-                    "desgasteAntes; " +
-                    "desgasteDepois; " +
-                    "\n")
-
-            for i in range(N1):                
-                for sensor in self.Sensores:
-                    numVibrations, \
-                    duration, \
-                    rms, \
-                    vib_min, \
-                    vib_max, \
-                    dft_max = self.importPassadaData(arq1_teste[i], sensor, arq1_faceamento[i], arq1_passada[i], 6)
-
-                    f.write("{:2d};".format(self.coleta) +
-                        " {:2s};".format(arq1_blocoOrigem[i]) +
-                        " {:2d};".format(arq1_bloco[i]) + 
-                        " {:2d};".format(arq1_teste[i]) + 
-                        " {:2d};".format(sensor) + 
-                        " {:2d};".format(arq1_faceamento[i]) + 
-                        " {:2d};".format(arq1_passada[i]) + 
-                        " {:10d};".format(numVibrations) + 
-                        " {:10.5f};".format(duration) + 
-                        " {:10.5f};".format(rms) + 
-                        " {:10.5f};".format(vib_min) + 
-                        " {:10.5f};".format(vib_max) + 
-                        " {:10.5f};".format(dft_max) + 
-                        " {:3d};".format(arq1_potenciaMediaObservada[i]) + 
-                        " {:4s};".format(arq1_desgasteAntes[i]) + 
-                        " {:4s};".format(arq1_desgasteDepois[i]) +
-                        "\n")
-                    
-
 
 
 if __name__ == '__main__':
+    Coleta = int(sys.argv[1])
+    Sensor = int(sys.argv[2])
+    testFrom = int(sys.argv[3])
+    testTo = int(sys.argv[4])
+    condition = int(sys.argv[5])
 
-    sensor = int(sys.argv[1])
-    chartBool = int(sys.argv[2])
+    TestSensores = [[],[],[],
+            [1,2],
+            [1,2,3],
+            [1,2,3],
+            [1,2,3],
+            [1,2,3],
+            [1,2,3],
+            [2,3],
+            [1],
+            [1],
+            [1,2,3],
+            [1,2,3],
+            [1,2,3]
+            ]
 
-    #Data
-    #Sensores = [1,2,3]
 
-    #v = VibAnalysis(15, 1, Sensores)
-    #v.exportTrainingDataSet()
-    #v.plotBars()
-    #v.plotBarsPassadasRMS()
-    #v.plotBarsFaceamentosRMS()
-    #v.plotBarsFaceamentosRMS(True)
+    #Plot Vibrations
+    if condition == 0:
+        v = VibAnalysis( coleta=Coleta, test=[testFrom,testTo], Sensores=[Sensor], skip=10, Frequence=[3] )
+        v.getVibrations([testFrom,testTo])
+        v.plotVibration(Sensor)
     
-    #v.getParameters(True, True)
-    #v.plotFaceamentos(1, 1, 34, 1, True)
-    #v.plotFaceamentos(1, 1, 34, 2, True)
-    
+    #Plot Spectrogram
+    elif condition == 1:
+        v = VibAnalysis( coleta=Coleta, test=[testFrom,testTo], Sensores=[Sensor], skip=20, Frequence=[3] )
+        v.getVibrations([testFrom,testTo])
+        v.plotEspectro2d(Sensor)
 
-    #v.plotBarsPassadasPower()
-    #v.determineVibRange(1, 2, 2, 2, False)
+    #ExportData
+    elif condition == 2:
+        Sensores = TestSensores[Coleta-1]
 
-    for coleta in [15]:
-        if chartBool == 0:
-            v = VibAnalysis( coleta=coleta, test=[1,34], Sensores=[sensor], skip=10, Frequence=[3] )
-            v.getVibrations([1,34])
-            v.plotVibration(sensor)
-        else:
-            v = VibAnalysis( coleta=coleta, test=[1,34], Sensores=[sensor], skip=20, Frequence=[3] )
-            v.getVibrations([1,34])
-            v.plotEspectro2d(sensor)
+        for test in range(testFrom, testTo+1):
+            v = VibAnalysis(Coleta, test, Sensores)
+            v.exportData(test, True, True)
+            v.exportDetailedData(test)
+            print("Export Data - Coleta", Coleta, "Test", test)
+
+    elif condition == 3:
+        pass
+            #for test in range(testFrom, testTo+1):
+            #    v = VibAnalysis(coleta, test, Sensores)
+            #    v.getVibrations(test)
+            #    v.getParameters(True, True)
+            #    for sensor in Sensores:
+            #        print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
+            #        #v.plotDFTParts(sensor, True)
+            #        v.plotVibrationParts(sensor, True)
+
+    elif condition == 4:
+        v = VibAnalysis( coleta=Coleta, Sensores=TestSensores[Coleta-1])
+        
+        #print("Training Dataset")
+        #v.exportTrainingDataSet()
+
+        v.plotBars()
+        v.plotBarsPassadasRMS(nPassadas = 7)
+        v.plotBarsFaceamentosRMS( nPassadas = 7)
+        v.plotBarsFaceamentosRMS( nPassadas = 7, join = True)
+        
+        #v.getParameters(True, True)
+        #v.plotFaceamentos(1, testFrom, testTo, 1, True)
+        #v.plotFaceamentos(1, testFrom, testTo, 2, True)
+        
+        #v.plotBarsPassadasPower(nPassadas = 7)
+        #v.determineVibRange(1, 2, 2, 2, False)
+
+    elif condition == 5:
+        pass
+
+
 
         #for test in range(1, 35):
         #    if test == 21 or test == 22 or test == 33:
