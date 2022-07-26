@@ -14,8 +14,8 @@ import sys
 
 
 # functions
-import get_vibrations
-import io_data
+from getvib import get_vibrations
+from io_data import * 
 
 
 
@@ -104,6 +104,18 @@ class VibAnalysis:
         self.dft_upper = [0,0,0]
         self.dft_max = [0,0,0]
 
+        #Get Vibrations
+        self.getVibrations = get_vibrations 
+
+        #Input Output Data
+        self.exportVibParts = export_vib_parts
+        self.importVibParts = import_vib_parts
+        self.importLUData = import_lu_data
+        self.importPassadaData = import_passada_data
+        self.exportTrainingDataSet = export_training_dataset
+        self.exportData = export_data
+        self.exportDetailedData = export_detailed_data
+
 
 
     def __del__(self):
@@ -128,18 +140,6 @@ class VibAnalysis:
         self.dft_max.clear()
 
     
-    #Get Vibrations
-    getVibrations = get_vibrations 
-
-    #Input Output Data
-    exportVibParts = export_vib_parts
-    importVibParts = import_vib_parts
-    importLUData = import_lu_data
-    importPassadaData = import_passada_data
-    exportTrainingDataSet = export_training_dataset
-    exportData = export_data
-    exportDetailedData = export_detailed_data
-
 
 
     def clearVibrations( self ):
@@ -516,8 +516,8 @@ class VibAnalysis:
                 
                 # Ajustar importação do desgaste
                 #ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
-                ax2.plot([-1, 25, 26, 27, 28, 29, 30], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
-                ax2.plot( [30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42,   43], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
+                ax2.plot([-1, 24, 25, 26, 27, 28, 29], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
+                ax2.plot( [29,   30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
 
                 plt.setp(ax1, xticks=x)
                 plt.setp(ax2, xticks=x)
@@ -553,8 +553,8 @@ class VibAnalysis:
 
             # Ajustar importação do desgaste
            # ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
-            ax2.plot( [-1, 25, 26, 27, 28, 29, 30], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
-            ax2.plot( [30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42,   43], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
+            ax2.plot([-1, 24, 25, 26, 27, 28, 29], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
+            ax2.plot( [29,   30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
 
             plt.setp( ax1, xticks=x )
             plt.setp( ax2, xticks=x )
@@ -648,8 +648,8 @@ class VibAnalysis:
 
             # Ajustar importação do desgaste
             #ax2.plot([-1, 49, 63], [0, 0.26, 0.56], marker = 'o', markersize=10, color='black', linestyle="None")
-            ax2.plot([-1, 25, 26, 27, 28, 29, 30], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
-            ax2.plot( [30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42,   43], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
+            ax2.plot([-1, 24, 25, 26, 27, 28, 29], [0, 0.16, 0.18, 0.16, 0.16, 0.44, 0.44], marker = 'o', markersize=10, color='black', linestyle="None")
+            ax2.plot( [29,   30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,   41,   42], [ 0, 0.13, 0.15, 0.15, 0.15, 0.18, 0.20, 0.20, 0.20, 0.20, 0.27, 0.25, 0.24, 0.31], marker = 'o', markersize=10, color='cyan', linestyle="None")
 
 
             plt.setp( ax1, xticks=x )
@@ -661,7 +661,7 @@ class VibAnalysis:
             ax1.set_ylim( 0, rms_max*1.1 )
             ax2.set_ylim( -0.02, 0.7 )
             ax1.legend( ['Linha de tendência ' + str(p),'Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
-            ax2.legend( ['Desgaste'], loc='upper right', fontsize = 15 )
+            ax2.legend( ['Desgaste aresta 1', 'Desgaste aresta 2'], loc='upper right', fontsize = 15 )
             plt.grid( linestyle='--', axis='y' )
             
             figpath = self.pathCharts + '/BarPassadasC' + str(self.coleta) + 'S' + str(sensor) + self.unit
