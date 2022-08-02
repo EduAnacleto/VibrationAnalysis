@@ -1,0 +1,80 @@
+{
+    "file_type": "csv",
+    "unit": "a",
+    "sample_rate": 100000,
+    "const_g": 9.80665,
+    "path": {
+        "coleta": "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta16",
+        "data": "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta16/Data",
+        "charts": "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta16/Charts",
+        "charts_parts": "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta16/ChartsParts"
+    },
+    "sensor": {
+        "legend": {
+            "1": "sensor IRFy",
+            "2": "sensor Dx",
+            "3": "sensor Dy"
+        },
+        "colors": {
+            "3": "yellowgreen", 
+            "2": "cornflowerblue",
+            "1": "lightcoral"
+        },
+        "darkcolors": {
+            "1": "olivedrab",
+            "2": "royalblue",
+            "3": "indianred"
+        }
+    },
+    "figure": {
+        "vibration": {
+            "title": {
+                "teste": "Gráfico no domínio do tempo do teste {:d} da coleta {:d}",
+                "testes": "Gráfico no domínio do tempo dos testes de {:d} até {:d} da coleta {:d}"
+            },
+            "limits": {
+                "activated": "True",
+                "lower": -170,
+                "upper": 170
+            },
+            "yLabel": "Aceleração em m/s^2",
+            "xLabel": "Tempo (s)",    
+	    "dpi": 100,
+            "hight": 5.5,
+	    "lenght": 20
+        },
+        "dft": {
+            "title": {
+                "teste": "Gráfico no domínio da frequência do teste {:d} da coleta {:d} do sensor {:d}",
+                "testes": "Gráfico no domínio da frequência dos testes de {:d} até {:d} da coleta {:d} do sensor {:d}"
+            },
+            "limits": {
+                "activated": "False",
+                "lower": 0,
+                "upper": 0
+            },
+            "yLabel": "Aceleração em m/s^2",
+            "xLabel": "Frequência (kHz)",            
+	    "dpi": 100,
+            "hight": 5.5,
+	    "lenght": 20
+        },
+        "Spectro2D": {
+            "title": {
+                "teste": "Gráfico no domínio do tempo e da frequência do teste {:d} da coleta {:d} do {:s}",
+                "testes": "Gráfico no domínio do tempo e da frequência dos testes de {:d} até {:d} da coleta {:d} do {:s}"
+            },
+            "limits": {
+                "lower": 0,
+                "center": 0.008,
+                "upper": 0.3
+            },
+            "yLabel": "Frequência (kHz)",
+            "xLabel": "Tempo (s)",
+            "zLabel": "Aceleração em m/s^2",            
+	    "dpi": 100,
+            "hight": 4.0,
+            "lenght": 20
+        }        
+    }
+}

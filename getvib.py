@@ -7,6 +7,11 @@
 # 4) Importação de uma sequência de partes de um teste
 
 def get_vibrations(self, test):
+
+    if type(test) == list:
+        if len(test) == 1:
+            test = test[0]
+
     if self.activeVibrations == True:
         self.clearVibrations()
     
@@ -84,7 +89,7 @@ def get_vibrations(self, test):
     else:
 
         for part in range(self.dxdPart[0], self.dxdPart[1]+1):
-            file_name = self.path + str(self.coleta) + "/Dados/faceamento " + str(test) + "_{:04d}.dxd".format(part)
+            file_name = self.path + str(self.coleta) + "/Dados/Test" + str(test) + "_{:04d}.dxd".format(part)
 
             print( file_name )
             with dw.open( file_name ) as f:

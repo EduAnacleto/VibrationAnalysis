@@ -11,11 +11,8 @@ from matplotlib import cm
 import matplotlib.colors as colors
 import sys
 
+import json
 
-
-# functions
-from getvib import get_vibrations
-from io_data import * 
 
 
 
@@ -42,29 +39,31 @@ class VibAnalysis:
             test = 5,
             Sensores = [1],
             dxdPart = None, #preencher com [v] ou [v1,v2]
-            sampleRate = 100000,
             Frequence = [7],
             skip = 0,
             path = "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta"
             ):
-
+        
         self.test = test
+        if type(self.test) == list:
+            if self.test[0] == self.test[1]:
+                self.test = self.test[0]
+
         self.coleta = coleta
         self.dxdPart = dxdPart
         self.Sensores = Sensores
-        self.sampleRate = sampleRate // (skip+1)
         self.Frequence = Frequence
         self.skip = skip
-        self.const_g = 0.109172
-        self.unit = 'a'
+
 
         self.path = path
         self.pathColeta = self.path + str(self.coleta)
         self.pathData = self.pathColeta + "/Data"
         self.pathCharts = self.pathColeta + "/Charts"
         self.pathChartsParts = self.pathColeta + "/ChartsParts"
+        self.pathParameters = "Parameters/coleta" + str(self.coleta)
 
-        #self.Colors = ['blue', 'red', 'green']
+
         self.Colors = ['cornflowerblue', 'lightcoral', 'yellowgreen']
         self.ColorsFace = [['cornflowerblue', 'royalblue'], ['lightcoral', 'indianred'], ['yellowgreen', 'olivedrab']]
 
@@ -99,22 +98,15 @@ class VibAnalysis:
         self.vib_max = [0,0,0]
 
         #dispersion measures - dft
-        self.dft_min = [0,0,0]
-        self.dft_lower = [0,0,0]
         self.dft_upper = [0,0,0]
         self.dft_max = [0,0,0]
 
-        #Get Vibrations
-        self.getVibrations = get_vibrations 
+        # Parameters
+        self.parameters = dict()
+        self.import_parameters()
 
-        #Input Output Data
-        self.exportVibParts = export_vib_parts
-        self.importVibParts = import_vib_parts
-        self.importLUData = import_lu_data
-        self.importPassadaData = import_passada_data
-        self.exportTrainingDataSet = export_training_dataset
-        self.exportData = export_data
-        self.exportDetailedData = export_detailed_data
+        # adjust after import parameters
+        self.parameters["sample_rate"] = self.parameters["sample_rate"] // (skip+1)
 
 
 
@@ -134,12 +126,18 @@ class VibAnalysis:
         self.vib_lower.clear()
         self.vib_upper.clear()
         self.vib_max.clear()
-        self.dft_min.clear()
-        self.dft_lower.clear()
         self.dft_upper.clear()
         self.dft_max.clear()
 
-    
+
+    def import_parameters( self ):
+        
+        if self.dxdPart == None: 
+            with open( self.pathParameters +  "_csv.json", "r") as f:
+                self.parameters = json.load(f)
+        else:
+            with open( self.pathParameters +  "_dxd.json", "r") as f:
+                self.parameters = json.load(f)
 
 
     def clearVibrations( self ):
@@ -160,7 +158,7 @@ class VibAnalysis:
     def DFT(self, y):
         Y = np.abs(fft(y))
         N = len(Y)
-        freq = fftfreq(N, 1.0 / self.sampleRate)
+        freq = fftfreq(N, 1.0 / self.parameters["sample_rate"])
         N //= 2
         return F[:N], Y[:N]
 
@@ -168,7 +166,7 @@ class VibAnalysis:
     def DFTNormalized(self, y):
         Y = np.abs(fft(y))
         N = len(Y)
-        F = fftfreq(N, 1.0 / self.sampleRate)
+        F = fftfreq(N, 1.0 / self.parameters["sample_rate"])
         F /= 1000.0
         N //= 2
         return N, F[:N], Y[:N]/N
@@ -248,7 +246,7 @@ class VibAnalysis:
                 for j in range(self.parts[sensor-1][i][1], self.parts[sensor-1][i][2]):
                     rms_pass += y[j]**2
 
-        self.durationPassadas[sensor-1] = pass_size / self.sampleRate
+        self.durationPassadas[sensor-1] = pass_size / self.parameters["sample_rate"]
         
         if movi_size != 0:
             rms_movi = math.sqrt( rms_movi / movi_size )
@@ -360,12 +358,327 @@ class VibAnalysis:
         return lower, upper
 
 
-    def getParameters( self, getLU = True, getParts = False ):
-        if getLU == True:
-            self.importLUData()
-        if getParts == True:
+    #def getParameters( self, getLU = True, getParts = False ):
+    #    if getLU == True:
+    #        self.importLUData()
+    #    if getParts == True:
+    #        for sensor in self.Sensores:
+    #            self.importVibParts(sensor)
+
+
+    #Get Vibrations
+    def getVibrations(self, test):
+
+        if type(test) == list:
+            if test[0] == test[1]:
+                test = test[0]
+
+        if self.activeVibrations == True:
+            self.clearVibrations()
+        
+        if self.parameters["file_type"] == "csv":
+            #Importação de um teste isolado ou sequência de testes
+            if type(test) != list:
+                # teste isolado
+                # read data
+                file_name = self.pathColeta + "/teste_" + str(test) + ".csv"
+                if os.path.isfile(file_name) == True:
+                    text_file = open(self.pathColeta + "/teste_" + str(test) + ".csv", "r" )
+
+                    #skip the first two lines
+                    next( text_file )
+                    next( text_file )
+                    self.numVibrations = 0;
+                    for line in text_file:
+                        row_text = line.split(';')
+                        for sensor in self.Sensores:
+                            self.Vibrations[sensor-1].append( float(row_text[sensor]) )
+                        self.numVibrations += 1
+                    text_file.close()
+
+                else:
+                    return False
+
+            else:
+                #Importa de parte de um teste ou uma sequência de partes
+                print('Get Vibrations C', self.coleta)
+                self.duration = 0
+                for part in range(test[0], test[1]+1):
+
+                    file_name = self.pathColeta + "/Dados/teste_" + str(part) + ".csv"
+                    if os.path.isfile(file_name) == False:
+                        print('building part', part)
+                        for sensor in self.Sensores:
+                            self.Vibrations[sensor-1] += [0] * (26000000// (self.skip + 1))
+                            # number of vibration records
+                            self.numVibrations += 26000000 // (self.skip + 1)
+                            # Duration in seconds
+                            self.duration += (26000000/(self.skip+1)) / self.parameters["sample_rate"]
+                            # time vector
+                    else:
+                        print('importing part', part)
+                        # Read data                    
+                        text_file = open( file_name, "r" )
+                        # skip the first two lines
+                        next( text_file )
+                        next( text_file )
+                        i = 0;
+                        for line in text_file:
+                            row_text = line.split(';')
+                            i += 1
+                            for sensor in self.Sensores:
+                                if i % (self.skip+1) == 0:
+                                    self.Vibrations[sensor-1].append( float(row_text[sensor]) )
+
+                        text_file.close()
+        
+        elif self.parameters["file_type"] == "dxd":
+            
+            if type(test) != list:
+            
+                for part in range(self.dxdPart[0], self.dxdPart[1]+1):
+                    file_name = self.path + str(self.coleta) + "/Dados/Test" + str(test) + "_{:04d}.dxd".format(part)
+
+                    print( file_name )
+                    with dw.open( file_name ) as f:
+                        canais = []
+                        canal = [[],[],[]]
+                        for ch in f.values():
+                            canais.append( ch.name )
+                        
+                        for sensor in self.Sensores:
+                            canal[sensor-1] = f[canais[sensor-1]].series()
+                            
+                            vibrations = list(canal[sensor-1].values)
+                            for i in range(len(vibrations)):
+                                if i % (self.skip+1) == 0:
+                                    self.Vibrations[sensor-1].append( vibrations[i] )
+
+            else:
+                
+                print()
+                for t in range(test[0], test[1]+1):
+                    for part in range(self.dxdPart[0], self.dxdPart[1]+1):
+                        file_name = self.path + str(self.coleta) + "/Dados/Test" + str(t) + "_{:04d}.dxd".format(part)
+
+                        if os.path.exists(file_name) == False:
+                            continue
+
+                        print('C', file_name )
+                        with dw.open( file_name ) as f:
+                            canais = []
+                            canal = [[],[],[]]
+                            for ch in f.values():
+                                canais.append( ch.name )
+                            
+                            for sensor in self.Sensores:
+                                canal[sensor-1] = f[canais[sensor-1]].series()
+                                vibrations = list(canal[sensor-1].values)
+                                #Time = list(canal[sensor-1].index)
+                                for i in range(len(vibrations)):
+                                    if i % (self.skip+1) == 0:
+                                        self.Vibrations[sensor-1].append( vibrations[i] )
+                                        #self.Time.append( Time[i] )
+                    
+
+        # number of vibrations
+        self.numVibrations = len(self.Vibrations[self.Sensores[0]-1])
+
+        # remoção do valor médio das vibrações
+        for sensor in self.Sensores:
+            avg = np.average( self.Vibrations[sensor-1] )
+            self.Vibrations[sensor-1] = [v - avg for v in self.Vibrations[sensor-1]]
+
+        # Convert g to m/s^2
+        if self.parameters['unit'] == 'g':
             for sensor in self.Sensores:
-                self.importVibParts(sensor)
+                self.Vibrations[sensor-1] = [ v * self.parameters['const_g'] for v in self.Vibrations[sensor-1] ]
+           
+        # Duration in seconds
+        self.duration = self.numVibrations / self.parameters["sample_rate"]
+        # time vector
+        self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
+
+        self.activeVibrations = True
+        return self.activeVibrations
+
+
+
+
+    def plotVibration( self, sensor, details = False ):
+
+        self.create_directory( self.parameters["path"]["charts"])
+
+        plt.rc('font', **{'size' : 18})
+        plt.ticklabel_format(style = 'plain')
+        plt.figure( 
+            figsize = (
+                self.parameters['figure']['vibration']['lenght'], 
+                self.parameters['figure']['vibration']['hight']
+                ), 
+            dpi= self.parameters['figure']['vibration']['dpi'] 
+            )
+
+        title = ''
+        if type(self.test) != list:
+            title = self.parameters['figure']['vibration']['title']['teste'].format(self.test, self.coleta)
+        else:
+            title = self.parameters['figure']['vibration']['title']['testes'].format(self.test[0], self.test[1], self.coleta)
+
+        #if self.dxdPart == None:
+        plt.title( title )
+        #else:
+        #    if self.dxdPart[0] == self.dxdPart[1]:
+        #        plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
+        #    else:
+        #        plt.title( title + " (arquivos de " + str(self.dxdPart[0]) + " até " + str(self.dxdPart[1]) + ")" )
+        
+        plt.plot( self.Time, self.Vibrations[sensor-1], self.parameters['sensor']['colors'][str(sensor)] )
+
+        if self.parameters['figure']['vibration']['limits']['activated'] == str(True):
+            plt.ylim( 
+                self.parameters['figure']['vibration']['limits']['lower'],
+                self.parameters['figure']['vibration']['limits']['upper']
+                )
+
+        plt.ylabel( self.parameters['figure']['vibration']['yLabel'] )
+        plt.xlabel( self.parameters['figure']['vibration']['xLabel'] )
+        plt.legend( [self.parameters['sensor']['legend'][str(sensor)]], loc='upper left' )
+        plt.grid( linestyle='--', axis='y' )
+
+        figpath = self.parameters["path"]["charts"] + '/VibT' + str(self.test) + 'S' + str(sensor)
+        if self.dxdPart == None:
+            plt.savefig( figpath + '.png' )
+        else:
+            plt.savefig( figpath + 'P' + str(self.dxdPart) + '.png')
+        plt.close()
+        plt.cla()
+        plt.clf()
+
+
+    def plotEspectro2d( self, sensor ):
+        self.create_directory(self.parameters["path"]["charts"])
+        f, t, Sxx = signal.spectrogram( np.array(self.Vibrations[sensor-1]), self.parameters["sample_rate"], nperseg=int(self.parameters["sample_rate"]), mode='magnitude')
+
+        for freq in self.Frequence:
+            myfilter = (f<=freq*1000)
+            f_i = f[myfilter]/1000
+            Sxx_i = Sxx[myfilter, ...]
+
+            #plt.rc('font', **{'size' : 18})
+            plt.ticklabel_format(style = 'plain')
+            plt.figure( 
+                figsize = (
+                    self.parameters['figure']['Spectro2D']['lenght'], 
+                    self.parameters['figure']['Spectro2D']['hight']
+                    ), 
+                dpi= self.parameters['figure']['Spectro2D']['dpi'] 
+                )
+
+            title = ''
+            if type(self.test) != list:
+                title = self.parameters['figure']['Spectro2D']['title']['teste'].format(self.test, self.coleta, self.parameters['sensor']['legend'][str(sensor)])
+            else:
+                title = self.parameters['figure']['Spectro2D']['title']['testes'].format(self.test[0], self.test[1], self.coleta, self.parameters['sensor']['legend'][str(sensor)] )
+
+            #if self.dxdPart == None:
+            plt.title( title )
+            #else:
+            #    if self.dxdPart[0] == self.dxdPart[1]:
+            #        plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
+            #    else:
+            #        plt.title( title + " (arquivos de " + str(self.dxdPart[0]) + " até " + str(self.dxdPart[1]) + ")" )
+     
+
+            #https://matplotlib.org/stable/tutorials/colors/colormapnorms.html
+            #(Terrain color map)
+            colors_undersea = plt.cm.terrain( np.linspace(0, 0.17, 256) )
+            colors_land = plt.cm.terrain( np.linspace(0.25, 1, 256) )
+            all_colors = np.vstack((colors_undersea, colors_land))
+            terrain_map = colors.LinearSegmentedColormap.from_list('terrain_map', all_colors)
+
+            #divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.025, vmax=0.5)
+            divnorm = colors.TwoSlopeNorm(
+                    vmin = self.parameters['figure']['Spectro2D']['limits']['lower'], 
+                    vcenter = self.parameters['figure']['Spectro2D']['limits']['center'], 
+                    vmax = self.parameters['figure']['Spectro2D']['limits']['upper']
+                )
+            plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, norm=divnorm, cmap=terrain_map, shading='auto')
+
+            cbar = plt.colorbar()
+            cbar.set_label(self.parameters['figure']['Spectro2D']['zLabel'])
+            plt.xlabel( self.parameters['figure']['Spectro2D']['xLabel'] )
+            plt.ylabel( self.parameters['figure']['Spectro2D']['yLabel'] )
+
+            figpath = self.pathCharts + '/Esp2DT' + str(self.test) + 'S' + str(sensor)
+            if self.dxdPart == None:
+                plt.savefig( figpath + '.png' )
+            else:
+                plt.savefig( figpath + 'P' + str(self.dxdPart) + '.png')
+            plt.close()
+            plt.cla()
+            plt.clf()
+
+
+
+    # Refatorar as demais funções
+
+
+
+    def plotVibrationParts( self, sensor, details = False ):
+        self.create_directory( self.parameters["path"]["charts_parts"])
+
+        # Constructing
+        for i in range(self.numParts[sensor-1]):
+
+            plt.rc( 'font', **{'size' : 18} )
+            plt.ticklabel_format( style = 'plain' )
+            plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
+            title = "Gráfico no domínio do tempo do teste " + str(self.test) + " da coleta " + str(self.coleta) + " no intervalo de tempo " + str(self.parts[sensor-1][i])
+
+
+            start = self.parts[sensor-1][i][1]
+            end = self.parts[sensor-1][i][2]
+
+
+            if self.coleta != 11 and self.coleta != 12:
+                plt.title( title )
+            else:
+                if self.dxdPart[0] == self.dxdPart[1]:
+                    plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
+                else:
+                    plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
+            
+
+                plt.plot( self.Time[start:end], self.Vibrations[sensor-1][start:end], self.Colors[sensor-1] )
+
+            Dets = ''
+            if details == True:
+                plt.ylim( self.vib_lower[sensor-1], self.vib_upper[sensor-1] )
+                #plt.axhline(y=self.vib_rms[sensor-1], color='m', linestyle='--')
+                Dets = 'D'
+
+            plt.ylabel( self.yLabel['a'] )
+            
+            #if details == True:
+                #plt.legend( self.Legend[sensor-1] + ['RMS'] )
+            #else:
+            plt.legend( self.Legend[sensor-1] )
+
+            plt.xlabel( "Tempo (s)" )
+            plt.grid( linestyle='--', axis='y' )
+
+            figpath = self.pathChartsParts + '/VibT' + str(self.test) + 'S' + str(sensor) + "[" + str(start) + "," + str(end) + "]" + Dets
+
+            if self.coleta != 11 and self.coleta != 12:
+                plt.savefig( figpath + '.png' )
+            else:
+                plt.savefig( figpath + 'P' + str(self.dxdPart) + '.png')
+
+            plt.close()
+            plt.cla()
+            plt.clf()
+ 
 
 
     def plotHistogram(self):
@@ -389,7 +702,7 @@ class VibAnalysis:
         self.create_directory("Charts")
 
         # Read data
-        text_file = open(self.pathData + "/data_" + self.unit + ".txt", "r")
+        text_file = open(self.pathData + "/data_" + ".txt", "r")
         for line in text_file:
             row_text = line.split(";")
             label.append(row_text[1])
@@ -423,10 +736,10 @@ class VibAnalysis:
         
         plt.xticks( x, label )
         plt.xlabel("testes", fontsize=15, labelpad=10 )
-        plt.ylabel( self.yLabel[self.unit], fontsize=15, labelpad=10 )
+        plt.ylabel( self.yLabel['a'], fontsize=15, labelpad=10 )
         plt.legend( legend )
         plt.grid( linestyle='--', axis='y' )
-        figpath = self.pathCharts + '/BarC' + str(self.coleta) + self.unit
+        figpath = self.pathCharts + '/BarC' + str(self.coleta) 
         plt.savefig( figpath + '.png' )
         plt.close()
         plt.cla()
@@ -523,14 +836,14 @@ class VibAnalysis:
                 plt.setp(ax2, xticks=x)
                 ax1.set_xticklabels(label[sensor-1], rotation=90, fontsize=12)
                 ax1.set_xlabel("teste - faceamento", fontsize=15, labelpad=10 )
-                ax1.set_ylabel( self.yLabel[self.unit], fontsize=15, labelpad=10 )
+                ax1.set_ylabel( self.yLabel['a'], fontsize=15, labelpad=10 )
                 ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
                 ax1.set_ylim( 0, rms_max*1.1)
                 ax2.set_ylim(-0.02, 0.7)
                 ax1.legend( ['Linha de tendência ' + str(p), 'Sensor ' + str(sensor)], loc='upper left', fontsize = 15 )
                 ax2.legend( ['Desgaste aresta 1', 'Desgaste aresta 2'], loc='upper right', fontsize = 15 )
                 plt.grid( linestyle='--', axis='y' )
-                figpath = self.pathCharts + '/BarFaceamentosC' + str(self.coleta) + 'S' + str(sensor) + self.unit
+                figpath = self.pathCharts + '/BarFaceamentosC' + str(self.coleta) + 'S' + str(sensor)  
                 plt.savefig( figpath + '.png' )
                 plt.close()
                 plt.cla()
@@ -560,7 +873,7 @@ class VibAnalysis:
             plt.setp( ax2, xticks=x )
             ax1.set_xticklabels( label[self.Sensores[0]-1], rotation=90, fontsize=12 )
             ax1.set_xlabel("teste - faceamento", fontsize=15, labelpad=10 )
-            ax1.set_ylabel( self.yLabel[self.unit], fontsize=15, labelpad=10 )
+            ax1.set_ylabel( self.yLabel['a'], fontsize=15, labelpad=10 )
             ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
             ax1.set_ylim( 0, rms_max*1.1)
             ax2.set_ylim(-0.02, 0.7)
@@ -568,7 +881,7 @@ class VibAnalysis:
             ax1.legend( ['Sensor ' + str(sensor) for sensor in self.Sensores], loc='upper left', fontsize = 15 )
             ax2.legend( ['Desgaste aresta 1', 'Desgaste aresta 2'], loc='upper right', fontsize = 15 )
             plt.grid( linestyle='--', axis='y' )
-            figpath = self.pathCharts + '/BarFaceamentosC' + str(self.coleta) + 'S123' + self.unit
+            figpath = self.pathCharts + '/BarFaceamentosC' + str(self.coleta) + 'S123' 
             plt.savefig( figpath + '.png' )
             plt.close()
             plt.cla()
@@ -656,7 +969,7 @@ class VibAnalysis:
             plt.setp( ax2, xticks=x )
             ax1.set_xticklabels( label[sensor-1], rotation=90, fontsize=12 )
             ax1.set_xlabel( "teste - faceamento", fontsize=15, labelpad=10 )
-            ax1.set_ylabel( self.yLabel[self.unit], fontsize=15, labelpad=10 )
+            ax1.set_ylabel( self.yLabel['a'], fontsize=15, labelpad=10 )
             ax2.set_ylabel( 'Desgaste (mm)', fontsize=15, labelpad=10 )
             ax1.set_ylim( 0, rms_max*1.1 )
             ax2.set_ylim( -0.02, 0.7 )
@@ -664,7 +977,7 @@ class VibAnalysis:
             ax2.legend( ['Desgaste aresta 1', 'Desgaste aresta 2'], loc='upper right', fontsize = 15 )
             plt.grid( linestyle='--', axis='y' )
             
-            figpath = self.pathCharts + '/BarPassadasC' + str(self.coleta) + 'S' + str(sensor) + self.unit
+            figpath = self.pathCharts + '/BarPassadasC' + str(self.coleta) + 'S' + str(sensor) 
             plt.savefig( figpath + '.png' )
             plt.close()
             plt.cla()
@@ -776,7 +1089,7 @@ class VibAnalysis:
         self.create_directory("Data")
 
         # Read data
-        text_file = open(self.pathData + "/data_" + self.unit + ".txt", "r")
+        text_file = open(self.pathData + "/data_" + ".txt", "r")
         for line in text_file:
             row_text = line.split(";")
             sensor = int(row_text[2])
@@ -793,7 +1106,7 @@ class VibAnalysis:
 
         N = len(rms[0])
 
-        with open(self.pathData + "/table_" + self.unit + ".tex", "w") as f:
+        with open(self.pathData + "/table_" + ".tex", "w") as f:
             for i in range(N):
                 f.write("\\midrule\n")
                 for sensor in self.Sensores[:1]:
@@ -832,63 +1145,7 @@ class VibAnalysis:
                         " \\\\ \n")
                    
     
-    def plotVibrationParts( self, sensor, details = False ):
-        self.create_directory("ChartsParts")
-
-        # Constructing
-        for i in range(self.numParts[sensor-1]):
-
-            plt.rc( 'font', **{'size' : 18} )
-            plt.ticklabel_format( style = 'plain' )
-            plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
-            title = "Gráfico no domínio do tempo do teste " + str(self.test) + " da coleta " + str(self.coleta) + " no intervalo de tempo " + str(self.parts[sensor-1][i])
-
-
-            start = self.parts[sensor-1][i][1]
-            end = self.parts[sensor-1][i][2]
-
-
-            if self.coleta != 11 and self.coleta != 12:
-                plt.title( title )
-            else:
-                if self.dxdPart[0] == self.dxdPart[1]:
-                    plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
-                else:
-                    plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
-            
-
-            if self.unit == 'a':
-                plt.plot( self.Time[start:end], self.Vibrations[sensor-1][start:end], self.Colors[sensor-1] )
-            elif self.unit == 'g':
-                plt.plot( self.Time[start:end], convert_to_g(self.Vibrations[sensor-1][start:end]), self.Colors[sensor-1] )
-
-            Dets = ''
-            if details == True:
-                plt.ylim( self.vib_lower[sensor-1], self.vib_upper[sensor-1] )
-                #plt.axhline(y=self.vib_rms[sensor-1], color='m', linestyle='--')
-                Dets = 'D'
-
-            plt.ylabel( self.yLabel[self.unit] )
-            
-            #if details == True:
-                #plt.legend( self.Legend[sensor-1] + ['RMS'] )
-            #else:
-            plt.legend( self.Legend[sensor-1] )
-
-            plt.xlabel( "Tempo (s)" )
-            plt.grid( linestyle='--', axis='y' )
-
-            figpath = self.pathChartsParts + '/VibT' + str(self.test) + 'S' + str(sensor) + "[" + str(start) + "," + str(end) + "]" + Dets
-
-            if self.coleta != 11 and self.coleta != 12:
-                plt.savefig( figpath + self.unit + '.png' )
-            else:
-                plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
-
-            plt.close()
-            plt.cla()
-            plt.clf()
-    
+   
     def plotVibFaces(self, sensor, time, vib1, test1, face1, color1=0, details = False):
 
         plt.rc('font', **{'size' : 18})
@@ -903,7 +1160,7 @@ class VibAnalysis:
         if details == True:
             plt.ylim( self.vib_lower[sensor-1], self.vib_upper[sensor-1] )
             Dets = 'D'
-        plt.ylabel( self.yLabel[self.unit] )
+        plt.ylabel( self.yLabel['a'] )
         
         plt.xlabel( "Tempo (s)" )
         plt.grid( linestyle = '--', axis = 'y' )
@@ -912,9 +1169,9 @@ class VibAnalysis:
         figpath = self.pathCharts + '/VibT' + str(test1) + 'F' + str(face1) + 'S' + str(sensor) + Dets
 
         if self.coleta != 11 and self.coleta != 12:
-            plt.savefig( figpath + self.unit + '.png' )
+            plt.savefig( figpath + '.png' )
         else:
-            plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png' )
+            plt.savefig( figpath + 'P' + str(self.dxdPart) + '.png' )
 
         plt.close()
         plt.cla()
@@ -950,7 +1207,7 @@ class VibAnalysis:
         if details == True:
             plt.ylim( self.vib_lower[sensor-1], self.vib_upper[sensor-1] )
             Dets = 'D'
-        plt.ylabel( self.yLabel[self.unit] )
+        plt.ylabel( self.yLabel['a'] )
         
         plt.xlabel( "Tempo (s)" )
         plt.grid( linestyle = '--', axis = 'y' )
@@ -962,9 +1219,9 @@ class VibAnalysis:
             figpath = self.pathCharts + '/VibT' + str(test2) + 'F' + str(face2) + 'T' + str(test1) + 'F' + str(face1) + 'S' + str(sensor) + Dets
 
         if self.coleta != 11 and self.coleta != 12:
-            plt.savefig( figpath + self.unit + '.png' )
+            plt.savefig( figpath + '.png' )
         else:
-            plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png' )
+            plt.savefig( figpath + 'P' + str(self.dxdPart) + '.png' )
 
         plt.close()
         plt.cla()
@@ -992,12 +1249,12 @@ class VibAnalysis:
                     plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
 
             if invert == False:
-                plt.plot( xf1[:int(N * ((2000*freq) / self.sampleRate))], yf1[:int(N * (2000*freq/self.sampleRate))], self.ColorsFace[sensor-1][color1] )
-                plt.plot( xf2[:int(N * ((2000*freq) / self.sampleRate))], yf2[:int(N * (2000*freq/self.sampleRate))], self.ColorsFace[sensor-1][color2] )
+                plt.plot( xf1[:int(N * ((2000*freq) / self.parameters["sample_rate"]))], yf1[:int(N * (2000*freq/self.parameters["sample_rate"]))], self.ColorsFace[sensor-1][color1] )
+                plt.plot( xf2[:int(N * ((2000*freq) / self.parameters["sample_rate"]))], yf2[:int(N * (2000*freq/self.parameters["sample_rate"]))], self.ColorsFace[sensor-1][color2] )
                 plt.legend( ['teste ' + str(test1) + ' - faceamento ' + str(face1) + ' - sensor ' + str(sensor), 'teste ' + str(test2) + ' - faceamento ' + str(face2) + ' - sensor ' + str(sensor)] )
             else:
-                plt.plot( xf2[:int(N * ((2000*freq) / self.sampleRate))], yf2[:int(N * (2000*freq/self.sampleRate))], self.ColorsFace[sensor-1][color2] )
-                plt.plot( xf1[:int(N * ((2000*freq) / self.sampleRate))], yf1[:int(N * (2000*freq/self.sampleRate))], self.ColorsFace[sensor-1][color1] )
+                plt.plot( xf2[:int(N * ((2000*freq) / self.parameters["sample_rate"]))], yf2[:int(N * (2000*freq/self.parameters["sample_rate"]))], self.ColorsFace[sensor-1][color2] )
+                plt.plot( xf1[:int(N * ((2000*freq) / self.parameters["sample_rate"]))], yf1[:int(N * (2000*freq/self.parameters["sample_rate"]))], self.ColorsFace[sensor-1][color1] )
                 plt.legend( ['teste ' + str(test2) + ' - faceamento ' + str(face2) + ' - sensor ' + str(sensor), 'teste ' + str(test1) + ' - faceamento ' + str(face1) + ' - sensor ' + str(sensor)] )
 
             
@@ -1008,7 +1265,7 @@ class VibAnalysis:
 
             plt.xlabel("Frequência (kHz)")
             plt.grid(linestyle='--', axis='y')
-            plt.ylabel( self.yLabel[self.unit] )
+            plt.ylabel( self.yLabel['a'] )
 
             figpath = ''
             if invert == False:
@@ -1017,9 +1274,9 @@ class VibAnalysis:
                 figpath = self.pathCharts + '/DFT' + str(freq) + 'kT' + str(test2) + 'F' + str(face2) + 'T' + str(test1) + 'F' + str(face1) + 'S' + str(sensor) + Dets
 
             if self.coleta != 11 and self.coleta != 12:
-                plt.savefig( figpath + self.unit + '.png' )
+                plt.savefig( figpath + '.png' )
             else:
-                plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
+                plt.savefig( figpath + 'P' + str(self.dxdPart) + '.png')
             plt.close()
             plt.cla()
             plt.clf()
@@ -1042,7 +1299,7 @@ class VibAnalysis:
             if end2 -start2 < duration:
                 duration = end2 - start2
 
-            time = np.linspace( 0.0, duration / self.sampleRate, duration, endpoint = False )
+            time = np.linspace( 0.0, duration / self.parameters["sample_rate"], duration, endpoint = False )
 
             self.getVibrations(test1)
             vib1 = np.array(self.Vibrations[sensor-1][start1:(start1 + duration)], dtype='float32')
@@ -1068,117 +1325,7 @@ class VibAnalysis:
 
 
     
-    def plotVibration( self, sensor, details = False ):
-        self.create_directory("Charts")
 
-        plt.rc('font', **{'size' : 18})
-        plt.ticklabel_format(style = 'plain')
-        plt.figure( figsize= (self.largura, self.altura), dpi= self.my_dpi )
-        title = ''
-        if type(self.test) != list:
-            title = "Gráfico no domínio do tempo do teste " + str(self.test) + " da coleta " + str(self.coleta)
-        else:
-            title = "Gráfico no domínio do tempo dos testes de " + str(self.test[0]) + " até " + str(self.test[1]) + " da coleta " + str(self.coleta)
-
-        if self.dxdPart == None:
-            plt.title( title )
-
-        else:
-            if self.dxdPart[0] == self.dxdPart[1]:
-                plt.title( title + " (arquivo " + str(self.dxdPart[0]) + ")" )
-            else:
-                plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
-        
-
-        if self.unit == 'a':
-            plt.plot( self.Time, self.Vibrations[sensor-1], self.Colors[sensor-1] )
-        elif self.unit == 'g':
-            plt.plot( self.Time, convert_to_g(self.Vibrations[sensor-1]), self.Colors[sensor-1] )
-
-        plt.ylim( -125, 125 )
-        Dets = ''
-        if details == True:
-            plt.ylim( self.vib_lower[sensor-1], self.vib_upper[sensor-1] )
-            plt.axhline( y=self.vib_rms[sensor-1], color='m', linestyle='--' )
-            Dets = 'D'
-
-        plt.ylabel( self.yLabel[self.unit] )
-        
-        if details == True:
-            plt.legend( self.Legend[sensor-1] + ['RMS'] )
-        else:
-            plt.legend( self.Legend[sensor-1], loc='upper left' )
-
-        plt.xlabel( "Tempo (s)" )
-        plt.grid( linestyle='--', axis='y' )
-
-        figpath = self.pathCharts + '/VibT' + str(self.test) + 'S' + str(sensor) + Dets
-        if self.dxdPart == None:
-            plt.savefig( figpath + self.unit + '.png' )
-        else:
-            plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
-        plt.close()
-        plt.cla()
-        plt.clf()
-
-
-
-    def plotEspectro2d( self, sensor ):
-        self.create_directory("Charts")
-        f, t, Sxx = signal.spectrogram( np.array(self.Vibrations[sensor-1]), self.sampleRate, nperseg=int(self.sampleRate), mode='magnitude')
-        #t *= (self.duration /np.max(t))
-        
-
-        for freq in self.Frequence:
-            myfilter = (f<=freq*1000)
-            f_i = f[myfilter]/1000
-            Sxx_i = Sxx[myfilter, ...]
-
-            #plt.rc('font', **{'size' : 18})
-            plt.ticklabel_format(style = 'plain')
-            plt.figure( figsize=(self.largura, self.altura), dpi= self.my_dpi )
-            if type(self.test) != list:
-                plt.title("Gráfico no dimínio da frequência e do tempo no teste " + str(self.test) + " da coleta " + str(self.coleta)) + " do sensor " + str(sensor)
-            else:
-                plt.title("Gráfico no domínio da frequência e do tempo nos testes de " + str(self.test[0]) + " até " + str(self.test[1]) + " da coleta " + str(self.coleta) + " do sensor " + str(sensor))
-                
-
-            #if sensor == 3:
-            #    plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, shading='gouraud', cmap=cm.Greens)
-            #elif sensor == 2:
-            #    plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, shading='gouraud', cmap=cm.Reds)
-            #else:
-                #plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, shading='gouraud', cmap=cm.Blues)
-                #plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, shading='gouraud', cmap='tab20')
-                #https://matplotlib.org/stable/tutorials/colors/colormapnorms.html
-                #(Terrain color map)
-            colors_undersea = plt.cm.terrain( np.linspace(0, 0.17, 256) )
-            colors_land = plt.cm.terrain( np.linspace(0.25, 1, 256) )
-            all_colors = np.vstack((colors_undersea, colors_land))
-            terrain_map = colors.LinearSegmentedColormap.from_list('terrain_map', all_colors)
-
-            #divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.025, vmax=0.5)
-            divnorm = colors.TwoSlopeNorm(vmin=0, vcenter=0.05, vmax=1)
-            plt.pcolormesh(t[None, :], f_i[:, None], Sxx_i, norm=divnorm, cmap=terrain_map, shading='auto')
-
-            cbar = plt.colorbar()
-            cbar.set_label('Aceleração (m/s^2)')
-
-            #plt.legend(Legend[sensor-1])
-            #plt.ylabel( ylabel )
-            plt.xlabel( "Tempo (s)" )
-            plt.ylabel( "Frequência (kHz)" )
-            #plt.xlabel( xlabel )
-            #plt.grid()
-
-            figpath = self.pathCharts + '/Esp2DT' + str(self.test) + 'S' + str(sensor)
-            if self.dxdPart == None:
-                plt.savefig( figpath + self.unit + '.png' )
-            else:
-                plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
-            plt.close()
-            plt.cla()
-            plt.clf()
 
 
 
@@ -1193,8 +1340,6 @@ class VibAnalysis:
             end = self.parts[sensor-1][i][2]
 
             y_ = self.Vibrations[sensor-1][start:end]
-            if self.unit == 'g':
-                y_ = self.convert_to_g(y_)
             N, xf, yf = self.DFTNormalized(y_)
 
             for freq in self.Frequence:
@@ -1211,7 +1356,7 @@ class VibAnalysis:
                     else:
                         plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
                 
-                plt.plot( xf[:int(N * ((2000*freq) / self.sampleRate))], yf[:int(N * (2000*freq/self.sampleRate))], self.Colors[sensor-1] )
+                plt.plot( xf[:int(N * ((2000*freq) / self.parameters["sample_rate"]))], yf[:int(N * (2000*freq/self.parameters["sample_rate"]))], self.Colors[sensor-1] )
                 
                 
                 Dets = ''
@@ -1222,14 +1367,14 @@ class VibAnalysis:
                 plt.xlabel("Frequência (kHz)")
                 plt.grid(linestyle='--', axis='y')
 
-                plt.ylabel( self.yLabel[self.unit] )
+                plt.ylabel( self.yLabel['a'] )
                 plt.legend( self.Legend[sensor-1] )
 
                 figpath = self.pathChartsParts + '/DFT' + str(freq) + 'kT' + str(self.test) + 'S' + str(sensor) + "[" + str(start) + "," + str(end) + "]" + Dets
                 if self.coleta != 11 and self.coleta != 12:
-                    plt.savefig( figpath + self.unit + '.png' )
+                    plt.savefig( figpath + '.png' )
                 else:
-                    plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
+                    plt.savefig( figpath + 'P' + str(self.dxdPart) + '.png')
                 plt.close()
                 plt.cla()
                 plt.clf()
@@ -1240,8 +1385,6 @@ class VibAnalysis:
         self.create_directory("Charts")
 
         y_ = self.Vibrations[sensor-1]
-        if self.unit == 'g':
-            y_ = self.convert_to_g(y_)
         N, xf, yf = self.DFTNormalized(y_)
 
         for freq in self.Frequence:
@@ -1258,7 +1401,7 @@ class VibAnalysis:
                 else:
                     plt.title( title + " (arquivos " + str(self.dxdPart) + ")" )
                         
-            plt.plot( xf[:int(N * ((2000*freq) / self.sampleRate))], yf[:int(N * (2000*freq/self.sampleRate))], self.Colors[sensor-1] )
+            plt.plot( xf[:int(N * ((2000*freq) / self.parameters["sample_rate"]))], yf[:int(N * (2000*freq/self.parameters["sample_rate"]))], self.Colors[sensor-1] )
             
             
             Dets = ''
@@ -1269,14 +1412,14 @@ class VibAnalysis:
             plt.xlabel("Frequência (kHz)")
             plt.grid(linestyle='--', axis='y')
 
-            plt.ylabel( self.yLabel[self.unit] )
+            plt.ylabel( self.yLabel['a'] )
             plt.legend( self.Legend[sensor-1] )
 
             figpath = self.pathCharts + '/DFT' + str(freq) + 'kT' + str(self.test) + 'S' + str(sensor) + Dets
             if self.coleta != 11 and self.coleta != 12:
-                plt.savefig( figpath + self.unit + '.png' )
+                plt.savefig( figpath + '.png' )
             else:
-                plt.savefig( figpath + 'P' + str(self.dxdPart) + self.unit + '.png')
+                plt.savefig( figpath + 'P' + str(self.dxdPart) + '.png')
             plt.close()
             plt.cla()
             plt.clf()
@@ -1374,16 +1517,298 @@ class VibAnalysis:
                 #Export parts to Data folder
                 self.exportVibParts(sensor)
 
+    def exportVibParts(self, sensor):
+        self.create_directory("Data")
+        if self.numParts[sensor-1] == 0:
+            return False
+        
+        with open(self.pathData + "/VibPartsT" + str(self.test) + "S" + str(sensor) + ".txt", "w") as f:
+            f.write(str(self.numParts[sensor-1]) + ";\n")
+            for i in range(self.numParts[sensor-1]):
+                f.write(str(self.parts[sensor-1][i][0]) + "; " + str(self.parts[sensor-1][i][1]) + "; " + str(self.parts[sensor-1][i][2]) + ";\n")
+        return True
 
-    
+
+    def importVibParts(self, sensor):
+
+        if self.numParts[sensor-1] == 0:
+            text_file = open(self.pathData + "/VibPartsT" + str(self.test) + "S" + str(sensor) + ".txt", "r")
+            line = next (text_file)
+            row_text = line.split(";")
+            self.numParts[sensor-1] = int(row_text[0])
+            self.numPassadas[sensor-1] = 0
+            for line in text_file:
+                row_text = line.split(";")
+                self.parts[sensor-1].append([int(row_text[0]), int(row_text[1]), int(row_text[2])])
+                self.numPassadas[sensor-1] += int(row_text[0])
+
+
+    def importLUData(self):
+        lower_vib = [[],[],[]]
+        upper_vib = [[],[],[]]
+        upper_dft = [[],[],[]]
+        text_file = open(self.pathData + "/data.txt", "r")
+        iteration = 0
+        for line in text_file:
+            row_text = line.split(";")
+            sensor = int(row_text[2])
+            
+            #if self.test == int(row_text[1]) and iteration == self.dxdPart[0]:
+            if self.test == int(row_text[1]):
+                self.vib_rms[sensor-1] = float(row_text[5])
+            lower_vib[sensor-1].append(float(row_text[13]))
+            upper_vib[sensor-1].append(float(row_text[14]))
+            upper_dft[sensor-1].append(float(row_text[16]))
+        text_file.close()
+        for sensor in self.Sensores:
+            self.vib_lower[sensor-1], blank = self.extValues_normalityBand(lower_vib[sensor-1])
+            blank, self.vib_upper[sensor-1] = self.extValues_normalityBand(upper_vib[sensor-1])
+            blank, self.dft_upper[sensor-1] = self.extValues_normalityBand(upper_dft[sensor-1])
+
+
+    def importPassadaData(self, teste, sensor, faceamento, passada, passada_por_faceamento): 
+        id_passada = passada + (faceamento-1)*passada_por_faceamento
+
+        numVibrations = 0
+        duration = 0
+        rms = 0
+        vib_min = 0
+        vib_max = 0
+        dft_max = 0
+        with open(self.pathData + "/detaileddata_" + ".txt", "r") as text_file:
+            num_passada = 0
+            for line in text_file:
+                row_text = line.split(';')
+                
+                if teste != int(row_text[1]):
+                    continue
+                if sensor != int(row_text[2]):
+                    continue
+                if int(row_text[3]) != 1:
+                    continue
+
+                num_passada += 1
+                if id_passada != num_passada:
+                    continue
+
+                numVibrations = int(row_text[4])
+                duration = float(row_text[5])
+                rms = float(row_text[6])
+                vib_min = float(row_text[7])
+                vib_max = float(row_text[10])
+                dft_max = float(row_text[12])
+                break
+
+        return numVibrations, duration, rms, vib_min, vib_max, dft_max
+
+
+    def exportTrainingDataSet(self):
+        # This functions may be used to merge the files 'detaliedData' and 'PotenciaPorPassada'
+        
+        arq1_title = ''
+        arq1_blocoOrigem = []
+        arq1_bloco = []
+        arq1_teste = []
+        arq1_faceamento = []
+        arq1_passada = []
+        arq1_potenciaMediaObservada = []
+        arq1_desgasteAntes = []
+        arq1_desgasteDepois = []
+        with open(self.pathData + "/PotenciaDesgastePorPassada.txt", "r") as text_file:
+            line = next(text_file)
+            arq1_title = line.split(";")
+            for line in text_file:
+                row_text = line.split(';')
+                arq1_blocoOrigem.append(str(row_text[0]))
+                arq1_bloco.append(int(row_text[1]))
+                arq1_teste.append(int(row_text[2]))
+                arq1_faceamento.append(int(row_text[3]))
+                arq1_passada.append(int(row_text[4]))
+                arq1_potenciaMediaObservada.append(int(row_text[5]))
+                arq1_desgasteAntes.append(row_text[6].strip())
+                arq1_desgasteDepois.append(row_text[7].strip())
+
+        N1 = len(arq1_teste)
+        
+        
+        arq2_teste = []
+        arq2_sensor = []
+        arq2_tipo_movimento = []
+        arq2_numVibrations = []
+        arq2_duration = []
+        arq2_rms = []
+        arq2_vib_min = []
+        arq2_vib_max = []
+        with open(self.pathData + "/detaileddata_" + ".txt", "r") as text_file:
+            for line in text_file:
+                row_text = line.split(';')
+                arq2_teste.append(int(row_text[1]))
+                arq2_sensor.append(int(row_text[2]))
+                arq2_tipo_movimento.append(int(row_text[3]))
+                arq2_numVibrations.append(int(row_text[4]))
+                arq2_duration.append(float(row_text[5]))
+                arq2_rms.append(float(row_text[6]))
+                arq2_vib_min.append(float(row_text[7]))
+                arq2_vib_max.append(float(row_text[10]))
+        N2 = len(arq2_teste)
+        
+
+        with open(self.pathData + "/trainingDataSet_" + ".txt", "w") as f:
+            
+            f.write("coleta; "+
+                    "blocoOrigem; " +
+                    "bloco; " +
+                    "teste; " +
+                    "sensor; " +
+                    "faceamento; " +
+                    "passada; " +
+                    "numVibrations; " +
+                    "duration; " +
+                    "RMS; " +
+                    "vibMax; " +
+                    "vibMin; " +
+                    "dftMax; " +
+                    "potencia; " +
+                    "desgasteAntes; " +
+                    "desgasteDepois; " +
+                    "\n")
+
+            for i in range(N1):                
+                for sensor in self.Sensores:
+                    numVibrations, \
+                    duration, \
+                    rms, \
+                    vib_min, \
+                    vib_max, \
+                    dft_max = self.importPassadaData(arq1_teste[i], sensor, arq1_faceamento[i], arq1_passada[i], 6)
+
+                    f.write("{:2d};".format(self.coleta) +
+                        " {:2s};".format(arq1_blocoOrigem[i]) +
+                        " {:2d};".format(arq1_bloco[i]) + 
+                        " {:2d};".format(arq1_teste[i]) + 
+                        " {:2d};".format(sensor) + 
+                        " {:2d};".format(arq1_faceamento[i]) + 
+                        " {:2d};".format(arq1_passada[i]) + 
+                        " {:10d};".format(numVibrations) + 
+                        " {:10.5f};".format(duration) + 
+                        " {:10.5f};".format(rms) + 
+                        " {:10.5f};".format(vib_min) + 
+                        " {:10.5f};".format(vib_max) + 
+                        " {:10.5f};".format(dft_max) + 
+                        " {:3d};".format(arq1_potenciaMediaObservada[i]) + 
+                        " {:4s};".format(arq1_desgasteAntes[i]) + 
+                        " {:4s};".format(arq1_desgasteDepois[i]) +
+                        "\n")
+                    
+
+
+    def exportData( self, test, setLU = True, setParts = False ):
+
+        self.create_directory("Data")
+        info = self.getVibrations(test)
+        
+        if info == True:
+            for sensor in self.Sensores:
+
+                if setLU == True:
+                    self.vib_rms[sensor-1] = self.get_rms(self.Vibrations[sensor-1])
+
+                    self.vib_min[sensor-1], \
+                    self.vib_lower[sensor-1], \
+                    self.vib_upper[sensor-1], \
+                    self.vib_max[sensor-1] = self.dispersion_measures(self.Vibrations[sensor-1])
+                    
+                    self.dft_min[sensor-1], \
+                    self.dft_lower[sensor-1], \
+                    self.dft_upper[sensor-1], \
+                    self.dft_max[sensor-1] = self.dft_dispersion_measures(self.Vibrations[sensor-1])
+
+                if setParts == True:
+                    self.vibrationParts(sensor)
+                    self.vib_rms_movi[sensor-1], self.vib_rms_pass[sensor-1] = self.get_rmsParts(sensor, self.Vibrations[sensor-1])
+
+                with open(self.pathData + "/data_" + ".txt", "a") as f:
+                    f.write("{:2d};".format(self.coleta) +
+                        " {:2d};".format(self.test) +
+                        " {:1d};".format(sensor) +
+                        " {:10d};".format(self.numVibrations) +
+                        " {:10.5f};".format(self.duration) +
+                        " {:10.5f};".format(self.vib_rms[sensor-1]) +
+                        " {:4d};".format(self.numPassadas[sensor-1]) +
+                        " {:10.5f};".format(self.durationPassadas[sensor-1]) +
+                        " {:10.5f};".format(self.vib_rms_pass[sensor-1]) +
+                        " {:4d};".format(self.numParts[sensor-1] - self.numPassadas[sensor-1]) +
+                        " {:10.5f};".format(self.duration - self.durationPassadas[sensor-1]) +
+                        " {:10.5f};".format(self.vib_rms_movi[sensor-1]) +
+                        " {:10.5f};".format(self.vib_min[sensor-1]) +
+                        " {:10.5f};".format(self.vib_lower[sensor-1]) +
+                        " {:10.5f};".format(self.vib_upper[sensor-1]) +
+                        " {:10.5f};".format(self.vib_max[sensor-1]) +
+                        " {:10.5f};".format(self.dft_upper[sensor-1]) +
+                        " {:10.5f};".format(self.dft_max[sensor-1]) +
+                        "\n")
+
+    def exportDetailedData( self, test ):
+
+        self.create_directory("Data")
+        info = self.getVibrations(test)
+
+        if info == True:
+            for sensor in self.Sensores:
+                self.vibrationParts(sensor)
+                for i in range(self.numParts[sensor-1]):
+                    type_moviment = self.parts[sensor-1][i][0]
+                    start = self.parts[sensor-1][i][1]
+                    end = self.parts[sensor-1][i][2]
+
+                    numVibrations = end - start
+                    duration = numVibrations / self.parameters["sample_rate"]
+
+                    vib_rms = self.get_rms(self.Vibrations[sensor-1][start:end])
+
+                    vib_min, \
+                    vib_lower, \
+                    vib_upper, \
+                    vib_max = self.dispersion_measures(self.Vibrations[sensor-1][start:end])
+                    
+                    dft_min, \
+                    dft_lower, \
+                    dft_upper, \
+                    dft_max = self.dft_dispersion_measures(self.Vibrations[sensor-1][start:end])
+
+                    with open(self.pathData + "/detaileddata.txt", "a") as f:
+                        f.write("{:2d};".format(self.coleta) +
+                            " {:2d};".format(self.test) +
+                            " {:1d};".format(sensor) +
+                            " {:1d};".format(type_moviment) +
+                            " {:10d};".format(numVibrations) +
+                            " {:10.5f};".format(duration) +
+                            " {:10.5f};".format(vib_rms) +
+                            " {:10.5f};".format(vib_min) +
+                            " {:10.5f};".format(vib_lower) +
+                            " {:10.5f};".format(vib_upper) +
+                            " {:10.5f};".format(vib_max) +
+                            " {:10.5f};".format(dft_upper) +
+                            " {:10.5f};".format(dft_max) +
+                            "\n")
+
 
 
 if __name__ == '__main__':
+
     Coleta = int(sys.argv[1])
     Sensor = int(sys.argv[2])
     testFrom = int(sys.argv[3])
     testTo = int(sys.argv[4])
     condition = int(sys.argv[5])
+    
+    dxd = False
+    dxdFrom = -1
+    dxdTo = -1
+    if len(sys.argv) > 6:
+        dxd = True
+        dxdFrom = int(sys.argv[6])
+        dxdTo = int(sys.argv[7])
 
     TestSensores = [[],[],[],
             [1,2],
@@ -1397,21 +1822,33 @@ if __name__ == '__main__':
             [1],
             [1,2,3],
             [1,2,3],
+            [1,2,3],
             [1,2,3]
             ]
 
 
     #Plot Vibrations
     if condition == 0:
-        v = VibAnalysis( coleta=Coleta, test=[testFrom,testTo], Sensores=[Sensor], skip=10, Frequence=[3] )
-        v.getVibrations([testFrom,testTo])
-        v.plotVibration(Sensor)
-    
+        if dxd == False:
+            v = VibAnalysis( coleta=Coleta, test=[testFrom,testTo], Sensores=[Sensor], skip=15 )
+            v.getVibrations(test=[testFrom,testTo])
+            v.plotVibration(Sensor)
+        else:
+            v = VibAnalysis( coleta=Coleta, test=[testFrom,testTo], Sensores=[Sensor], dxdPart=[dxdFrom,dxdTo], skip=1 )
+            v.getVibrations(test=[testFrom,testTo])
+            v.plotVibration(Sensor)
+
+        
     #Plot Spectrogram
     elif condition == 1:
-        v = VibAnalysis( coleta=Coleta, test=[testFrom,testTo], Sensores=[Sensor], skip=20, Frequence=[3] )
-        v.getVibrations([testFrom,testTo])
-        v.plotEspectro2d(Sensor)
+        if dxd == False:
+            v = VibAnalysis( coleta=Coleta, test=[testFrom,testTo], Sensores=[Sensor], skip=20, Frequence=[3] )
+            v.getVibrations([testFrom,testTo])
+            v.plotEspectro2d(Sensor)
+        else:
+            v = VibAnalysis( coleta=Coleta, test=[testFrom,testTo], Sensores=[Sensor], dxdPart=[dxdFrom,dxdTo], skip=1, Frequence=[3] )
+            v.getVibrations([testFrom,testTo])
+            v.plotEspectro2d(Sensor)
 
     #ExportData
     elif condition == 2:
@@ -1455,252 +1892,3 @@ if __name__ == '__main__':
     elif condition == 5:
         pass
 
-
-
-        #for test in range(1, 35):
-        #    if test == 21 or test == 22 or test == 33:
-        #        continue
-        #    v = VibAnalysis(coleta, test, Sensores)
-        #    v.exportData(True, True)
-        #    v.exportDetailedData()
-        #    print("Export Data - Coleta", coleta, "Test", test)
-
-        #for test in range(1, 35):
-        #    if test == 21 or test == 22 or test == 33:
-        #        continue
-        #    v = VibAnalysis(coleta, test, Sensores)
-        #    v.getVibrations(test)
-        #    v.getParameters(True, True)
-            #v.plotBars()
-            #v.buildTable()
-            #for sensor in Sensores:
-                #print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-                #v.plotDFTParts(sensor, True)
-                #v.plotVibrationParts(sensor, True)
-                #v.plotVibration(sensor, True)
-            #    #v.plotVibration(sensor, False)
-            #    v.plotDFT(sensor, True)
-            #    #v.plotDFT(sensor, False)
-
-    
-    #Sensores = [1,2,3]
-    #for coleta in [14]:
-    #    #for test in range(1, 13):
-    #    #    if test == 4:
-    #    #        continue
-    #    #    v = VibAnalysis(coleta, test, Sensores)
-    #    #    v.exportData(True, True)
-    #    #    v.exportDetailedData()
-    #    #    print("Export Data - Coleta", coleta, "Test", test)
-
-    #    for test in range(1, 13):
-    #        if test == 4:
-    #            continue
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        #v.plotBars()
-    #        #v.buildTable()
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-    #    #        #v.plotVibration(sensor, True)
-    #    #    #    #v.plotVibration(sensor, False)
-    #    #    #    v.plotDFT(sensor, True)
-    #    #    #    #v.plotDFT(sensor, False)
-
-
-    #Sensores = [1,2,3]
-    #for coleta in [13]:
-    #    for test in range(1, 14):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.exportData(True, True)
-    #        v.exportDetailedData()
-    #        print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(1, 14):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-
-    #Sensores = [1]
-    #dxdPart = [[0,77],[0,63],[0,62]]
-    #for coleta in [12]:
-    #    #for test in range(1, 3+1):
-    #    #    v = VibAnalysis(coleta=coleta, test=test, dxdPart=dxdPart[test-1], skip=10)
-    #    #    v.exportData(test, True, False)
-    #    #    v.exportDetailedData()
-    #    #    print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(3, 3+1):
-    #        v = VibAnalysis(coleta=coleta, test=test, dxdPart=dxdPart[test-1], skip=10)
-    #        v.getVibrations(test)
-    #        v.getParameters(getLU=True, getParts=False)
-    #        for sensor in Sensores:
-    #            #v.plotVibration(sensor=sensor, details=True)
-    #            v.plotDFT(sensor=sensor)
-    #            v.plotDFT(sensor=sensor, details=True)
-    #        #    print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #        #    v.plotDFTParts(sensor, True)
-    #        #    v.plotVibrationParts(sensor, True)
-    #        #    print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #        #    v.plotDFTParts(sensor, True)
-    #        #    v.plotVibrationParts(sensor, True)
-
-
-
-    #Sensores = [1,2,3]
-    #for coleta in [10]:
-    #    for test in range(1, 22):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.exportData(True, True)
-    #        v.exportDetailedData()
-    #        print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(1, 22):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-
-    #Sensores = [1,2,3]
-    #for coleta in [9]:
-    #    for test in range(1, 11):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.exportData(True, True)
-    #        v.exportDetailedData()
-    #        print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(1, 11):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-
-    #Sensores = [1,2,3]
-    #for coleta in [8]:
-    #    for test in range(1, 17):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.exportData(True, True)
-    #        v.exportDetailedData()
-    #        print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(1, 17):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-
-    #Sensores = [1,2,3]
-    #for coleta in [7]:
-    #    for test in range(1, 8):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.exportData(True, True)
-    #        v.exportDetailedData()
-    #        print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(1, 8):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-
-    #Sensores = [1,2,3]
-    #for coleta in [6]:
-    #    for test in range(1, 5):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.exportData(True, True)
-    #        v.exportDetailedData()
-    #        print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(1, 5):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-
-    #Sensores = [1,2,3]
-    #for coleta in [5]:
-    #    for test in range(1, 20):
-    #        if test == 2:
-    #            continue
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.exportData(True, True)
-    #        v.exportDetailedData()
-    #        print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(1, 20):
-    #        if test == 2:
-    #            continue
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-
-    #Sensores = [1,2]
-    #for coleta in [4]:
-    #    for test in range(1, 7):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.exportData(True, True)
-    #        v.exportDetailedData()
-    #        print("Export Data - Coleta", coleta, "Test", test)
-    #    for test in range(1, 7):
-    #        v = VibAnalysis(coleta, test, Sensores)
-    #        v.getVibrations()
-    #        v.getParameters(True, True)
-    #        for sensor in Sensores:
-    #            print("Plot - Coleta", coleta, "Test", test, "Sensor", sensor)
-    #            v.plotDFTParts(sensor, True)
-    #            v.plotVibrationParts(sensor, True)
-
-
-
-
-    #for coleta in [12]:
-    #    Sensores = [1]
-    #    for test in [1]:
-    #        for arq in range(78):
-    #            v = VibAnalysis(coleta, test, Sensores, [arq,arq])
-    #            v.exportData()                
-    #            print("Coleta", coleta, "Test", test, "Arq", arq, "- Parameters")
-        #for sensor in Sensores:
-        #    v.plotVibration(sensor)
-        #    v.plotDFT(sensor)
-        #print("Coleta", coleta, "Test", test, "Arq", arq, "- Charts")
-                   
-
-    #for coleta in [14]:
-    #    for test in [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12]:
-    #        v = VibAnalysis(coleta, test, [1, 2, 3])
-    #        v.exportData()
-    #        print("Coleta", coleta, "Test", test)
-    #for coleta in [13]:
-    #    for test in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]:
-    #        v = VibAnalysis(coleta, test, [1, 2, 3])
-    #        v.exportData()
-    #        print("Coleta", coleta, "Test", test)
-
-    #Sensores = [1]
-    #for arq in range(78):
-    #    v = VibAnalysis(12, 1, Sensores, [arq, arq])
-    #    v.getVibrations()
-    #    #v.vibrationParts()
-    #    v.getParameters()
-    #    for sensor in Sensores:
-    #        v.plotVibration(sensor)
-    #        v.plotDFT(sensor)
