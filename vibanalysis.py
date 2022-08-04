@@ -11,6 +11,7 @@ from matplotlib import cm
 import matplotlib.colors as colors
 import sys
 
+import csv
 import json
 
 
@@ -429,8 +430,10 @@ class VibAnalysis:
                             for sensor in self.Sensores:
                                 if i % (self.skip+1) == 0:
                                     self.Vibrations[sensor-1].append( float(row_text[sensor]) )
+                                    self.Time.append( int(row_text[0]) - self.parameters['first_timestamp'] )
 
                         text_file.close()
+
         
         elif self.parameters["file_type"] == "dxd":
             
@@ -497,7 +500,7 @@ class VibAnalysis:
         # Duration in seconds
         self.duration = self.numVibrations / self.parameters["sample_rate"]
         # time vector
-        self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
+        #self.Time = np.linspace(0.0, self.duration, self.numVibrations, endpoint=False).tolist()
 
         self.activeVibrations = True
         return self.activeVibrations
@@ -1792,6 +1795,68 @@ class VibAnalysis:
                             " {:10.5f};".format(dft_max) +
                             "\n")
 
+    def convert_dxd_to_csv(self, test):
+        
+        for t in range(test[0], test[1]+1):
+            for part in range(self.dxdPart[0], self.dxdPart[1]+1):
+                file_name = self.path + str(self.coleta) + "/Dados/Test" + str(t) + "_{:04d}.dxd".format(part)
+
+                if os.path.exists(file_name) == False:
+                    continue
+
+                
+
+                print('C', file_name )
+                with dw.open( file_name ) as f:
+
+                    canais = []
+                    canal = [[],[],[]]
+
+                    print('\nInformações')
+                    print(f.info)
+                    print('\nEventos')
+                    print(f.events())
+                    print('\nData frame')
+                    print(f.dataframe())
+                    for ch in f.values():
+                        canais.append( ch.name )
+                    exit()
+                    
+
+                    
+                    tmin = [[],[],[]]
+                    tmax = [[],[],[]]
+                    with open(self.path + str(self.coleta) + "/Dados/dxd_to_csv/Test" + str(t) + "_{:04d}.csv".format(part), 'w', newline='') as csvfile:
+                        fieldnames = ['timestamp_sensor1', 'vibracao_sensor1','timestamp_sensor2', 'vibracao_sensor2','timestamp_sensor3', 'vibracao_sensor3']
+                        write = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=';')
+                        write.writeheader()
+                    
+                        vibrations = [[],[],[]]
+                        times = [[],[],[]]
+                        for sensor in self.Sensores:
+                            canal[sensor-1] = f[canais[sensor-1]].series()
+                            vibrations[sensor-1] = list(canal[sensor-1].values)
+                            times[sensor-1] = list(canal[sensor-1].index)
+                            tmin[sensor-1] = times[sensor-1][0]
+                            tmax[sensor-1] = times[sensor-1][-1]
+
+                        for i in range(len(times[self.Sensores[0]-1])):
+                            row_value = dict()
+                            for sensor in self.Sensores:
+                                row_value[f'timestamp_sensor{sensor}'] = times[sensor-1][i]
+                                row_value[f'vibracao_sensor{sensor}'] = vibrations[sensor-1][i]
+                            write.writerow(row_value)
+
+                    with open(self.path + str(self.coleta) + "/Dados/dxd_to_csv/times.csv", 'a', newline='') as csvfile:
+                        fieldnames = ['file', 'sensor', 'min_timestamp','max_timestamp']
+                        write = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=';')
+                        for sensor in self.Sensores:
+                            write.writerow({'file': "Test" + str(t) + "_{:04d}.csv".format(part),
+                                            'sensor': sensor,
+                                            'min_timestamp': tmin[sensor-1],
+                                            'max_timestamp': tmax[sensor-1]})
+                            
+                            
 
 
 if __name__ == '__main__':
@@ -1826,6 +1891,7 @@ if __name__ == '__main__':
             [1,2,3]
             ]
 
+    
 
     #Plot Vibrations
     if condition == 0:
@@ -1890,5 +1956,9 @@ if __name__ == '__main__':
         #v.determineVibRange(1, 2, 2, 2, False)
 
     elif condition == 5:
+        #Convert dxd file to csv
+        v = VibAnalysis( coleta=Coleta, dxdPart=[dxdFrom,dxdTo], Sensores=[1,2,3])
+        v.convert_dxd_to_csv(test=[testFrom,testTo])
+    
         pass
 

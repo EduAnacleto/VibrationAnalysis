@@ -13,7 +13,7 @@
         "legend": {
             "1": "sensor Dz",
             "2": "sensor Dx",
-            "3": "sensor Dy"
+            "3": "sensor DSpindle"
         },
         "colors": {
             "1": "yellowgreen", 

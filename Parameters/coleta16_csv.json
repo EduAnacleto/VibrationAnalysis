@@ -3,6 +3,7 @@
     "unit": "a",
     "sample_rate": 100000,
     "const_g": 9.80665,
+    "first_timestamp": 1656956641000000,
     "path": {
         "coleta": "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta16",
         "data": "/media/eduardo/HDEduardoAnacleto/DADOS/Coleta16/Data",

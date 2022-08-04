@@ -1,15 +1,18 @@
 #!bin/bash
+
+####### Coleta 16 ###################
+python3 vibanalysis.py 16 1 1 3 5 0 46
+
 #python3 vibanalysis.py 16 1 1 7 0
 #python3 vibanalysis.py 16 1 1 7 1
 
-python3 vibanalysis.py 16 1 1 3 0 0 46
-python3 vibanalysis.py 16 2 1 3 0 0 46
-python3 vibanalysis.py 16 3 1 3 0 0 46
-
+#python3 vibanalysis.py 16 1 1 3 0 0 46
+#python3 vibanalysis.py 16 2 1 3 0 0 46
+#python3 vibanalysis.py 16 3 1 3 0 0 46
+#
 #python3 vibanalysis.py 16 1 1 3 1 0 46
 #python3 vibanalysis.py 16 2 1 3 1 0 46
 #python3 vibanalysis.py 16 3 1 3 1 0 46
-#
 #
 #python3 vibanalysis.py 16 1 1 1 0 4 35
 #python3 vibanalysis.py 16 2 1 1 0 4 35
